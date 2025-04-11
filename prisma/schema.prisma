@@ -1,0 +1,152 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  clerkUserId String?   @unique
+  email       String    @unique
+  name        String?
+  imageUrl    String? 
+  status      UserStatus @default(invited)
+  role        UserRole   @default(executor)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  chains      Chain[]      @relation("ChainOwner")
+  taskUsers   TaskUser[]
+  comments    Comment[]
+  files       File[]
+}
+
+enum UserStatus {
+  invited
+  active
+  deactivated
+  pending_approval
+}
+
+enum UserRole {
+  admin
+  executor
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  chains      Chain[]
+}
+
+model Chain {
+  id          String    @id @default(cuid())
+  name        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+
+  ownerId     String
+  owner       User      @relation("ChainOwner", fields: [ownerId], references: [id])
+
+  tasks       Task[]
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  sortOrder   Int?
+  status      TaskStatus @default(pending)
+
+  chain       Chain    @relation(fields: [chainId], references: [id])
+  chainId     String
+
+  assignments TaskUser[]
+  comments    Comment[]
+
+  // Self-referencing many-to-many dependency (without explicit pivot)
+  dependencies  Task[] @relation("TaskDependencies")
+  dependedOnBy  Task[] @relation("TaskDependencies")
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+}
+
+model TaskUser {
+  id        String    @id @default(cuid())
+  taskId    String
+  userId    String
+  role      TaskRole
+  approved  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  task      Task      @relation(fields: [taskId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([taskId, userId])
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  content   String
+  createdAt DateTime  @default(now())
+  taskId    String
+  userId    String
+
+  task      Task      @relation(fields: [taskId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+  files     File[]   
+}
+
+model File {
+  id         String    @id @default(cuid())
+  url        String
+  name       String
+  createdAt  DateTime  @default(now())
+  commentId  String
+  userId     String
+  source     FileSource @default(S3)
+
+  comment    Comment   @relation(fields: [commentId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+}
+
+enum TaskRole {
+  worker
+  approver
+  viewer
+}
+
+enum TaskStatus {
+  pending
+  working
+  done
+}
+
+enum FileSource {
+  S3
+  SHAREPOINT
+}

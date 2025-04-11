@@ -1,0 +1,29 @@
+# Dockerfile.dev
+FROM node:20-alpine
+WORKDIR /app
+
+# Kopiera bara package-filer först för cachning
+COPY package*.json ./
+
+# Installera projektberoenden INUTI containern
+RUN npm install
+
+# Kopiera resten av koden (behövs för t.ex. prisma generate senare)
+# Notera: Denna kod kommer "överskuggas" av bind mount i docker-compose
+# men är bra att ha i imagen för t.ex. `docker-compose exec`.
+COPY . .
+
+# Kör Prisma Generate om/när Prisma är installerat
+# RUN npx prisma generate
+COPY prisma ./prisma
+#RUN npx prisma generate
+
+# Exponera rätt port (Vite default)
+EXPOSE 5173
+EXPOSE 3000
+
+# Kör Remix dev server och lyssna på alla interfaces
+# Säkerställ att ditt package.json "dev" script inkluderar detta eller kör så här:
+# CMD ["npm", "run", "dev", "--", "-h", "0.0.0.0"] # Äldre sätt
+# Nyare Remix/Vite hanterar ofta detta automatiskt via `remix vite:dev`
+CMD ["npm", "run", "dev"]

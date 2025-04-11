@@ -1,0 +1,47 @@
+# docker-compose.yml
+version: '3.8'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: nordberry_app_dev
+    ports:
+      # Mappa container-port 5173 till host-port 5173
+      - "5173:5173"
+      - "3000:3000"  # 👈 Lägg till denna rad för backend
+    volumes:
+      # Viktigt: Mappa lokal kod till /app i containern
+      # Ändringar lokalt syns direkt i containern -> HMR!
+      - .:/app
+      # Undanta node_modules från mappningen - använd de i containern
+      # Detta är en "named volume mount" inuti containern
+      - /app/node_modules
+    env_file: .env
+    environment:
+      - NODE_ENV=development
+      # Uppdatera med dina värden från .env
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # CHOKIDAR_USEPOLLING=true # Kan behövas på vissa system för att file watching ska funka
+    networks:
+      - nordberry_network
+  db:
+    image: postgres:15-alpine
+    container_name: nordberry_db_dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # För extern DB-åtkomst
+    networks:
+      - nordberry_network
+    restart: unless-stopped
+networks:
+  nordberry_network:
+    driver: bridge
+volumes:
+  postgres_data_dev: # Separat volym för dev-databasen
+    driver: local
