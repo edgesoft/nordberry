@@ -27,11 +27,6 @@ export default defineConfig({
     host: true, // Valfritt: Kan hjälpa att säkerställa att servern lyssnar på 0.0.0.0
       port: 5173,
     allowedHosts: [
-      // Lägg till ditt NGROK-värdnamn från felmeddelandet HÄR:
-      '1851-158-174-158-78.ngrok-free.app',
-
-      // Lägg till fler om du behöver, t.ex. om du använder andra tunnlar
-      // localhost och 127.0.0.1 är oftast tillåtna som standard ändå
     ],
   },
 });

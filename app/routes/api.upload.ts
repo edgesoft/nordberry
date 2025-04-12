@@ -1,7 +1,5 @@
 import { json } from "@remix-run/node";
-import { s3Client, S3_BUCKET_NAME } from "~/utils/s3.server";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { v4 as uuidv4 } from "uuid";
+import { s3Client } from "../utils/s3.server";
 import { Upload } from "@aws-sdk/lib-storage";
 
 export const action = async ({ request }) => {

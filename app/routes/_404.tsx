@@ -1,5 +1,4 @@
 import { Link } from "@remix-run/react";
-import Header from "~/components/header";
 
 export default function NotFound() {
   return (

@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { Webhook } from "svix";
 import type { WebhookEvent } from "svix"; // Importera typen från svix
-import { prisma } from "~/utils/db.server";
+import { prisma } from "../utils/db.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   // 1. Hämta din Webhook Signing Secret från miljövariabler

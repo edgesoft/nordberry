@@ -1,9 +1,9 @@
 import { Outlet, useLoaderData, Link, useNavigate } from "@remix-run/react";
-import { prisma } from "~/utils/db.server";
+import { prisma } from "../utils/db.server";
 import { json } from "@remix-run/node";
-import TaskStep from "~/components/task-step";
-import { requireUser } from "~/utils/auth.server";
-import { useNordEvent } from "~/hooks/useNordEvent";
+import TaskStep from "../components/task-step";
+import { requireUser } from "../utils/auth.server";
+import { useNordEvent } from "../hooks/useNordEvent";
 
 export async function loader(args: LoaderArgs) {
   const dbUser = await requireUser(args, { requireActiveStatus: true });
@@ -49,7 +49,11 @@ export function EmptyChainsPanel() {
   return (
     <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-sm">
       {/* Header / ikon / grid-mönster-bakgrund */}
-      <div className="bg-zinc-950 border-b border-zinc-800 p-6 flex justify-center items-center">
+      <Link
+        prefetch="intent"
+        to="/chains/new"
+        className="bg-zinc-950 border-b border-zinc-800 p-6 flex justify-center items-center"
+      >
         {/* Exempelikon – byt gärna mot din egen SVG eller bild */}
         <svg
           className="h-8 w-8 text-zinc-500"
@@ -64,23 +68,23 @@ export function EmptyChainsPanel() {
             d="M12 4v16m8-8H4"
           />
         </svg>
-      </div>
+      </Link>
 
       {/* Text-content */}
       <div className="p-6 bg-zinc-930">
         <h3 className="text-white text-lg font-semibold mb-2">
-          Inga kedjor ännu
+          Inga flöden ännu
         </h3>
         <p className="text-sm text-zinc-500 mb-6 leading-relaxed">
-          Kom igång genom att skapa din första kedja för att strukturera
-          arbetet.
+          Kom igång genom att skapa ditt första flöde.
         </p>
 
         <Link
           to="/chains/new"
+          prefetch="intent"
           className="text-sm text-zinc-600  rounded-md font-medium hover:underline inline-flex items-center gap-1"
         >
-          Skapa ny kedja
+          Skapa nytt flöde
           <svg
             className="w-4 h-4"
             fill="none"
@@ -160,7 +164,7 @@ export default function ChainView() {
           <button
             onClick={() => navigate(`/chains/new`)}
             className="fixed bottom-6 right-4  bg-green-700 hover:bg-green-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg transition-transform hover:scale-105"
-            aria-label="Skapa ny kedja"
+            aria-label="Skapa nytt flöde"
           >
             <svg
               className="w-6 h-6"

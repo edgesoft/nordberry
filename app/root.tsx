@@ -6,22 +6,22 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
-  useRouteError
+  useRouteError,
 } from "@remix-run/react";
 import { dark } from "@clerk/themes";
-import { prisma } from "~/utils/db.server";
+import { prisma } from "./utils/db.server";
 import { rootAuthLoader } from "@clerk/remix/ssr.server";
-import tailwindStylesheetUrl from "~/tailwind.css?url";
+import tailwindStylesheetUrl from "./tailwind.css?url";
 import Header from "./components/header";
 import NotFound from "./routes/_404";
-import toast, { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from "react-hot-toast";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: tailwindStylesheetUrl },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "icon",
-    href: "/favicon.png", // Sökväg från roten eftersom den ligger i /public
+    href: "/logo-slick.png", // Sökväg från roten eftersom den ligger i /public
     type: "image/png",
   },
   {
@@ -36,21 +36,31 @@ export const links: LinksFunction = () => [
 ];
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
+  const metaImage = `${data.baseUrl}/meta-og.png?v=${data.timestamp}`;
   return [
     { title: "Nordberry" },
     { name: "description", content: "Nordberry project manager" },
 
     { property: "og:title", content: "Nordberry project manager" },
     { property: "og:description", content: "Nordberry project manager" },
-    { property: "og:url", content: "https://moaclayco-prod.s3.eu-north-1.amazonaws.com" },
-    { property: "og:image", content: `https://moaclayco-prod.s3.eu-north-1.amazonaws.com/meta.png` },
+    {
+      property: "og:url",
+      content: data.baseUrl,
+    },
+    {
+      property: "og:image",
+      content: metaImage,
+    },
     { property: "og:type", content: "website" },
 
     // Twitter
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:title", content: "Nordberry project manager" },
     { name: "twitter:description", content: "Beskrivning av sidan" },
-    { name: "twitter:image", content: `https://moaclayco-prod.s3.eu-north-1.amazonaws.com/meta.png` },
+    {
+      name: "twitter:image",
+      content: metaImage,
+    },
   ];
 };
 
@@ -58,8 +68,11 @@ export const loader: LoaderFunction = (args) => {
   return rootAuthLoader(args, async ({ request }) => {
     const { sessionId, userId, getToken } = request.auth;
     const url = new URL(request.url);
-   // const baseUrl = `${url.protocol}//${url.host}`;
-   const baseUrl = `https://${url.host}`;
+    const baseUrl =
+      url.hostname === "localhost"
+        ? `${url.protocol}//${url.host}`
+        : `https://${url.host}`;
+
     const dbUser = userId
       ? await prisma.user.findUnique({
           where: { clerkUserId: userId },
@@ -71,7 +84,8 @@ export const loader: LoaderFunction = (args) => {
       sessionId,
       getToken,
       dbUser,
-      baseUrl
+      baseUrl,
+      timestamp: Date.now()
     };
   });
 };
@@ -125,7 +139,7 @@ export function App() {
           <Header />
         </div>
         <Outlet />
-        <Toaster/>
+        <Toaster />
         <ScrollRestoration />
         <Scripts />
       </body>

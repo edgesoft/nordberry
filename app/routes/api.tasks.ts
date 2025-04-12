@@ -1,7 +1,6 @@
 import { json } from "@remix-run/node";
-import { prisma } from "~/utils/db.server";
-import { getAuth } from "@clerk/remix/ssr.server";
-import { requireUser } from "~/utils/auth.server";
+import { prisma } from "../utils/db.server";
+import { requireUser } from "../utils/auth.server";
 
 export const loader = async (args: LoaderFunctionArgs) => {
    

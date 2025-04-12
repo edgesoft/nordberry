@@ -1,10 +1,10 @@
-import { useRouteLoaderData, Link, useLoaderData, useParams, Outlet } from "@remix-run/react";
-import { prisma } from "~/utils/db.server";
+import { useRouteLoaderData, Link, useLoaderData, Outlet } from "@remix-run/react";
+import { prisma } from "../utils/db.server";
 import { json } from "@remix-run/node";
-import { ringColors } from "~/utils/colors";
-import Avatar from "~/components/avatar";
-import { requireUser } from "~/utils/auth.server";
-import { useNordEvent } from "~/hooks/useNordEvent";
+import { ringColors } from "../utils/colors";
+import Avatar from "../components/avatar";
+import { requireUser } from "../utils/auth.server";
+import { useNordEvent } from "../hooks/useNordEvent";
 
 export const loader = async (args: LoaderFunctionArgs) => {
 

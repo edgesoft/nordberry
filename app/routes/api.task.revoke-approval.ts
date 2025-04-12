@@ -1,7 +1,6 @@
 import { json } from "@remix-run/node";
-import { prisma } from "~/utils/db.server";
+import { prisma } from "../utils/db.server";
 import { getAuth } from "@clerk/remix/ssr.server";
-import { TaskRole, TaskStatus } from "@prisma/client";
 
 export const action = async (args) => {
     const { userId } = await getAuth(args);

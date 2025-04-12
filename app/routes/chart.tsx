@@ -145,9 +145,9 @@ const conventionCommitteeData = {
   coordinator: {
     title: "Conv. Comm. Coordinator",
     people: [ { name: "Jan Kraft", verified: true }],
-    assistantPeople: [],
-    roleTitle: "Coordinator",
-    assistantRoleTitle: "Assistant Coordinator",
+    assistantPeople: [{name: "Seth Johansson", verified: true}],
+    roleTitle: "CCC",
+    assistantRoleTitle: "CCCA",
     departments: [
       { title: "Accounts", people: [] },
       { title: "Attendants", people: [] },
@@ -157,10 +157,10 @@ const conventionCommitteeData = {
   },
   programOverseer: {
     title: "Program Overseer",
-    people: [{ name: "Björn Gullberg", verified: true }],
-    assistantPeople: [{ name: "Anton Karlsson", verified: false }],
-    roleTitle: "Overseer",
-    assistantRoleTitle: "Assistant Overseer",
+    people: [{ name: "Joakim Östman", verified: true }],
+    assistantPeople: [{ name: "Anton Karlsson", verified: true }],
+    roleTitle: "PO",
+    assistantRoleTitle: "POA",
     departments: [
       { title: "Audio/Video", people: [] },
       { title: "Baptism", people: [] },
@@ -168,10 +168,10 @@ const conventionCommitteeData = {
   },
   roomingOverseer: {
     title: "Rooming Overseer",
-    people: [{ name: "Raymond Beaini", verified: false }, { name: "Tobias Wright", verified: false }],
-    assistantPeople: [],
-    roleTitle: "Overseer",
-    assistantRoleTitle: "Assistant Overseer",
+    people: [{ name: "Mikael Vähäkari", verified: true }],
+    assistantPeople: [{ name: "Daniel Nilsson", verified: true }],
+    roleTitle: "RO",
+    assistantRoleTitle: "ROA",
     departments: [
       { title: "Cleaning", people: [] },
       { title: "Information & Vol. Service", people: [] },
@@ -207,19 +207,19 @@ const hospitalityCommitteeData = {
   hc1: {
     title: "HC-1",
     people: [{ name: "Lars Brorsson", verified: true }],
-    assistantPeople: [],
+    assistantPeople: [ {name: "Robert Claeson", verified: true }],
     roleTitle: "HC-1",
     assistantRoleTitle: "HCA-1",
     departments: [
       { title: "Airports", people: [] },
-      { title: "Delegate Rooming", people: [{ name: "Tobias Wright", verified: false }] },
+      { title: "Delegate Rooming", people: [{ name: "Raymond Beaini", verified: true }] },
       { title: "Transportation", people: [] },
     ],
   },
   hc2: {
     title: "HC-2",
     people: [{ name: "Benjamin Hugó", verified: true }],
-    assistantPeople: [],
+    assistantPeople: [{ name: "Tobias Wright", verified: true }],
     roleTitle: "HC-2",
     assistantRoleTitle: "HCA-2",
     departments: [
@@ -230,13 +230,13 @@ const hospitalityCommitteeData = {
   },
   hc3: {
     title: "HC-3",
-    people: [{name: "Björn Gullberg", verified: true}, {name: "Dennis Greus", verified: false},{name: "Magnus Linderoth", verified: false}],
-    assistantPeople: [],
+    people: [{name: "Björn Gullberg", verified: true}],
+    assistantPeople: [{name: "Dennis Greus", verified: true}],
     roleTitle: "HC-3",
     assistantRoleTitle: "HCA-3",
     departments: [
-      { title: "Delegate Management", people: [{name: "Joakim Östman", verified: false}] },
-      { title: "Volunteer Management", people: [{name: "Joakim Östman", verified: false}] },
+      { title: "Delegate Management", people: [] },
+      { title: "Volunteer Management", people: [] },
       { title: "Safety", people: [{name: "Peter Johansson", verified: false}] },
     ],
   },
@@ -248,7 +248,7 @@ export default function ConventionOrgChart() {
   const { hc1, hc2, hc3 } = hospitalityCommitteeData;
 
   return (
-    <div className="p-2 bg-neutral-950 text-white min-h-screen overflow-x-auto">
+    <div className="p-2 pt-5 fixed top-0 bg-neutral-950 text-white min-h-screen overflow-x-auto z-99 w-full">
       <h1 className="text-xl font-bold text-center mb-4">Convention Organization Chart</h1>
 
       {/* ÄNDRING HÄR: flex-wrap borttagen för att förhindra radbrytning */}

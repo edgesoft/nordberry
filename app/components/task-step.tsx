@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, Link } from '@remix-run/react'; // Importera Link
-import { ringColors } from '~/utils/colors'; // Anpassa sökväg
+import { ringColors } from '../utils/colors'; // Anpassa sökväg
 
 // Interface för task-data (samma som tidigare)
 interface TaskStepData {

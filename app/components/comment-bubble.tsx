@@ -1,7 +1,7 @@
-import { useLongHoverPress } from "~/hooks/useLongHoverPress";
-import Avatar from "~/components/avatar";
-import { useLoaderData, Link, useFetcher, useMatches } from "@remix-run/react";
-import toast, { Toaster } from 'react-hot-toast';
+import { useLongHoverPress } from "../hooks/useLongHoverPress";
+import Avatar from "../components/avatar";
+import { useFetcher } from "@remix-run/react";
+import toast from 'react-hot-toast';
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);

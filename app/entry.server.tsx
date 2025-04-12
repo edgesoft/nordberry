@@ -13,6 +13,27 @@ import { isbot } from "isbot";
 import { renderToPipeableStream } from "react-dom/server";
 
 const ABORT_DELAY = 5_000;
+let heartbeatStarted = false;
+
+function setupHeartbeat(request: Request) {
+  if (heartbeatStarted) return;
+  heartbeatStarted = true;
+
+  const url = getBaseUrlFromRequest(request);
+  if (url && !url.includes("localhost") && process.env.NODE_ENV === "production") {
+    console.log(`🔁 Starting heartbeat pings to ${url}`);
+    setInterval(() => {
+      fetch(url)
+        .then(() => {})
+        .catch((err) => console.error("Heartbeat ping failed:", err));
+    }, 10000); 
+  }
+}
+
+function getBaseUrlFromRequest(request: Request): string {
+  const { protocol, host } = new URL(request.url);
+  return `${protocol}//${host}`;
+}
 
 export default function handleRequest(
   request: Request,
@@ -24,6 +45,7 @@ export default function handleRequest(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   loadContext: AppLoadContext
 ) {
+  setupHeartbeat(request)
   return isbot(request.headers.get("user-agent") || "")
     ? handleBotRequest(
         request,

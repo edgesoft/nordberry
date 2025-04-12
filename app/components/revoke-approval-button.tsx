@@ -1,15 +1,14 @@
 // Fil: app/components/RevokeApprovalButton.jsx
 import React, { useState, useCallback } from "react"; // useEffect behövs inte längre här (om inte för annat)
 import { useFetcher } from "@remix-run/react";
-import ConfirmModal from "~/components/confirm-modal"; // Anpassa sökväg
-// import toast from 'react-hot-toast'; // <-- Borttagen import
-import { TaskStatus } from "@prisma/client"; // Importera enum om du använder TypeScript
+import ConfirmModal from "../components/confirm-modal"; // Anpassa sökväg
+
 
 // Interface för props (om du använder TypeScript)
 interface RevokeApprovalButtonProps {
   taskId: string;
   userId: string;
-  taskStatus: TaskStatus; // Ta emot aktuell task-status
+  taskStatus: string; // Ta emot aktuell task-status
 }
 
 function RevokeApprovalButton({
@@ -24,7 +23,7 @@ function RevokeApprovalButton({
 
   // Härledd state från fetcher och props
   const isSubmitting = fetcher.state !== "idle";
-  const isTaskDone = taskStatus === TaskStatus.done;
+  const isTaskDone = taskStatus === "done";
   const isDisabled = isSubmitting || isTaskDone || taskStatus !== "working";
 
   //

@@ -1,7 +1,11 @@
 // file-upload.tsx
 import { useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Task } from "@prisma/client";
+
+interface TaskForComponent {
+  id: string;
+  status: "pending" | "working" | "done";
+}
 
 interface UploadedFile {
   id: string;
@@ -20,7 +24,7 @@ interface UploadingFile {
 }
 
 interface Props {
-  task: Task;
+  task: TaskForComponent;
   onUploadComplete: (files: UploadedFile[]) => void;
   uploadingFiles: UploadingFile[];
   setUploadingFiles: React.Dispatch<React.SetStateAction<UploadingFile[]>>;

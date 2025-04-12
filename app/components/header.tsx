@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { SignedIn, UserButton, useAuth } from "@clerk/remix";
 import { Link, useLoaderData } from "@remix-run/react";
 import { createPortal } from "react-dom";
-import { ringColors } from "~/utils/colors"; // Se till att du har denna!
+import { ringColors } from "../utils/colors"; // Se till att du har denna!
 
 interface MenuOverlayProps {
   onClose: () => void;
@@ -272,7 +272,7 @@ const Header = () => {
         className="flex items-center gap-3 min-w-fit min-w-[120px]"
       >
         <img
-          src="/logo-1.png"
+          src="/logo-slick.png"
           alt="Logo"
           className="h-12 w-12"
           loading="eager"
@@ -287,7 +287,7 @@ const Header = () => {
           >
             <input
               type="text"
-              placeholder="Sök projekt eller steg..."
+              placeholder="Sök flöde eller steg..."
               value={searchQuery}
               onFocus={() => {
                 if (searchQuery && searchResults.length === 0) {
@@ -326,7 +326,7 @@ const Header = () => {
                           </span>
                           <span className="text-xs text-zinc-600 font-mono">
                             #{task.id.slice(0, 6)} –{" "}
-                            {task.chain?.name ?? "Okänd kedja"}
+                            {task.chain?.name ?? "Okänt flöde"}
                           </span>
                         </div>
                       </div>
@@ -350,7 +350,7 @@ const Header = () => {
                           </span>
                           <span className="text-xs text-zinc-500 font-mono">
                             #{task.id.slice(0, 6)} –{" "}
-                            {task.chain?.name ?? "Okänd kedja"}
+                            {task.chain?.name ?? "Okänt flöde"}
                           </span>
                         </div>
                       </Link>

@@ -4,11 +4,11 @@ const { Client: PgClient } = pg;
 import EventEmitter from 'events'; // Node.js inbyggda
 
 // --- Konfiguration ---
-const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_URL_PG = process.env.DATABASE_URL_PG;
 const NOTIFY_CHANNEL = 'updates_channel'; // Måste matcha kanalen i SQL-triggern!
 // --- Slut Konfiguration ---
 
-if (!DATABASE_URL) {
+if (!DATABASE_URL_PG) {
   console.warn("NOTIFICATION LISTENER: DATABASE_URL is not set. Real-time updates disabled.");
 }
 
@@ -24,7 +24,7 @@ let retryTimeout: NodeJS.Timeout | null = null;
 
 // Funktion för att ansluta och börja lyssna
 async function connectAndListen(): Promise<void> {
-  if (!DATABASE_URL) {
+  if (!DATABASE_URL_PG) {
     throw new Error("DATABASE_URL is not set for listener.");
   }
   // Förhindra flera samtidiga anslutningsförsök
@@ -40,7 +40,7 @@ async function connectAndListen(): Promise<void> {
     }
     if (retryTimeout) clearTimeout(retryTimeout); // Rensa eventuell väntande återanslutning
 
-    const client = new PgClient({ connectionString: DATABASE_URL });
+    const client = new PgClient({ connectionString: DATABASE_URL_PG });
     listenerClient = client; // Spara direkt
 
     client.on('error', (err) => {
@@ -128,7 +128,7 @@ async function ensureListenerReady(): Promise<void> {
 
 // Anslut i bakgrunden när modulen laddas (valfritt)
 // Om detta misslyckas kommer ensureListenerReady försöka igen senare.
-if (DATABASE_URL) {
+if (DATABASE_URL_PG) {
   connectAndListen().catch(err => {
     console.error("Initial background connection for listener failed:", err.message);
   });

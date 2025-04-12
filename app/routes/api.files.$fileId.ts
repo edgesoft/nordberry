@@ -1,7 +1,7 @@
 import { LoaderFunction } from "@remix-run/node";
 import { getAuth } from "@clerk/remix/ssr.server";
-import { prisma } from "~/utils/db.server";
-import { s3Client } from "~/utils/s3.server";
+import { prisma } from "../utils/db.server";
+import { s3Client } from "../utils/s3.server";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 
 export const loader: LoaderFunction = async (args) => {

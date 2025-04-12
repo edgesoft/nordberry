@@ -4,7 +4,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node"; // Anpassa efter din 
 import {
   notificationEmitter,
   ensureListenerReady,
-} from "~/utils/notification-listener.server.ts"; // Importera från din listener-service
+} from "../utils/notification-listener.server.ts"; // Importera från din listener-service
 
 // Denna loader-funktion hanterar SSE-anslutningen
 export async function loader({ request }: LoaderFunctionArgs) {

@@ -2,7 +2,7 @@
 import { redirect, json } from "@remix-run/node";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { getAuth } from "@clerk/remix/ssr.server";
-import { prisma } from "~/utils/db.server"; // Importera din Prisma-instans
+import { prisma } from "../utils/db.server"; // Importera din Prisma-instans
 import { UserStatus, UserRole } from "@prisma/client"; // Importera dina Prisma Enums
 
 

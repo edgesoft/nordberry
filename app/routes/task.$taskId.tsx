@@ -1,16 +1,16 @@
 import { useLoaderData, Link, useFetcher, useMatches } from "@remix-run/react";
+import { prisma } from "../utils/db.server";
 import { json } from "@remix-run/node";
-import { prisma } from "~/utils/db.server";
 import { useState, useEffect } from "react";
-import Avatar from "~/components/avatar";
+import Avatar from "../components/avatar";
 import { getAuth } from "@clerk/remix/ssr.server";
-import TaskStep from "~/components/task-step";
-import ConfirmModal from "~/components/confirm-modal";
-import { requireUser } from "~/utils/auth.server";
-import RevokeApprovalButton from "~/components/revoke-approval-button";
-import { FileUploader } from "~/components/file-upload";
-import { useNordEvent } from "~/hooks/useNordEvent";
-import { CommentBubble } from "~/components/comment-bubble";
+import TaskStep from "../components/task-step";
+import ConfirmModal from "../components/confirm-modal";
+import { requireUser } from "../utils/auth.server";
+import RevokeApprovalButton from "../components/revoke-approval-button";
+import { FileUploader } from "../components/file-upload";
+import { useNordEvent } from "../hooks/useNordEvent";
+import { CommentBubble } from "../components/comment-bubble";
 
 export const loader = async (args) => {
   await requireUser(args, { requireActiveStatus: true });
@@ -103,7 +103,6 @@ function extractLinkedFiles(content: string) {
 export const action = async (args) => {
   const { userId } = await getAuth(args);
   if (!userId) return new Response("Unauthorized", { status: 401 });
-
   const { request } = args;
   const formData = await request.formData();
   const content = formData.get("content")?.toString().trim();
