@@ -36,7 +36,10 @@ export const links: LinksFunction = () => [
 ];
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const metaImage = `${data.baseUrl}/meta-og.png?v=${data.timestamp}`;
+  const metaImage = `${data.baseUrl}/meta-og.jpg`;
+
+  const imageWidth = "1536";
+  const imageHeight = "1024";
   return [
     { title: "Nordberry" },
     { name: "description", content: "Nordberry project manager" },
@@ -52,6 +55,9 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
       content: metaImage,
     },
     { property: "og:type", content: "website" },
+    { property: "og:image:width", content: imageWidth },    // <<< Bredd från bild
+    { property: "og:image:height", content: imageHeight },
+    { property: "og:image:type", content: "image/jpeg" },
 
     // Twitter
     { name: "twitter:card", content: "summary_large_image" },
@@ -79,13 +85,21 @@ export const loader: LoaderFunction = (args) => {
         })
       : null;
 
+    let pendingApprovalCount = 0;
+    if (dbUser?.role === 'admin') {
+      pendingApprovalCount = await prisma.user.count({
+        where: { status: 'pending_approval' },
+      });
+    }
+
     return {
       userId,
       sessionId,
       getToken,
       dbUser,
       baseUrl,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      pendingApprovalCount
     };
   });
 };
