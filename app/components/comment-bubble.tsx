@@ -2,6 +2,7 @@ import { useLongHoverPress } from "../hooks/useLongHoverPress";
 import Avatar from "../components/avatar";
 import { useFetcher } from "@remix-run/react";
 import toast from 'react-hot-toast';
+import { sourceMatchers } from "~/utils/sourceMatcher";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -16,19 +17,6 @@ function timeAgo(date: Date): string {
   return rtf.format(-days, "day");
 }
 
-const sourceMatchers = [
-  {
-    regex: /https:\/\/[\w.-]+\.sharepoint\.com\/[^\s)"]+/g,
-    source: "SHAREPOINT",
-    extractName: (url: string) => {
-      const match = url.match(/file=([^&]+)/i);
-      if (match?.[1]) return decodeURIComponent(match[1]);
-      return decodeURIComponent(
-        url.split("/").pop()?.split("?")[0] ?? "SharePoint-länk"
-      );
-    },
-  },
-];
 
 function renderCommentWithLinks(text: string): React.ReactNode {
   let remaining = text;

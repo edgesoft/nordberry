@@ -11,6 +11,7 @@ import RevokeApprovalButton from "../components/revoke-approval-button";
 import { FileUploader } from "../components/file-upload";
 import { useNordEvent } from "../hooks/useNordEvent";
 import { CommentBubble } from "../components/comment-bubble";
+import { sourceMatchers } from "~/utils/sourceMatcher";
 
 export const loader = async (args) => {
   await requireUser(args, { requireActiveStatus: true });
@@ -69,19 +70,7 @@ export const loader = async (args) => {
   return json({ task, chain });
 };
 
-const sourceMatchers = [
-  {
-    regex: /https:\/\/[\w.-]+\.sharepoint\.com\/[^\s)"]+/g,
-    source: "SHAREPOINT",
-    extractName: (url: string) => {
-      const match = url.match(/file=([^&]+)/i);
-      if (match?.[1]) return decodeURIComponent(match[1]);
-      return decodeURIComponent(
-        url.split("/").pop()?.split("?")[0] ?? "SharePoint-länk"
-      );
-    },
-  },
-];
+
 
 function extractLinkedFiles(content: string) {
   const results: { url: string; source: string; name: string }[] = [];
@@ -519,7 +508,7 @@ export default function TaskView() {
                   task.status === "working" &&
                   comment.trim() &&
                   !hasUnfinishedUploads
-                    ? "bg-zinc-800 hover:bg-zinc-700 hover:scale-105 cursor-pointer"
+                    ? "bg-green-700 hover:bg-green-600 hover:scale-105 cursor-pointer"
                     : "bg-zinc-700 opacity-50 cursor-not-allowed"
                 }
               `}
