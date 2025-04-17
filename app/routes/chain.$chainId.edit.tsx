@@ -6,7 +6,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import type { Step } from "~/types/chainTypes";
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
-  const chainId = params.id!;
+  const chainId = params.chainId!;
   const chain = await prisma.chain.findUnique({
     where: { id: chainId },
     include: {
@@ -64,7 +64,7 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const chainId = params.id;
+  const chainId = params.chainId;
   if (!chainId) return json({ error: "saknar id" }, 400);
 
   console.log("chainId", chainId);
@@ -186,7 +186,7 @@ export default function EditChain() {
     deletedSteps: string[];
   }) {
     try {
-      await fetch(`/chains/${id}/edit`, {
+      await fetch(`/chain/${id}/edit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

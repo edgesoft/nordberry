@@ -86,7 +86,7 @@ export const loader = async (args: LoaderFunctionArgs) => {
     },
   });
 
-  // Steg 3: Räkna antal filer per task
+
   const fileCountPerTask = new Map<string, number>();
 
   for (const file of fileTaskLinks) {
@@ -94,7 +94,6 @@ export const loader = async (args: LoaderFunctionArgs) => {
     fileCountPerTask.set(taskId, (fileCountPerTask.get(taskId) ?? 0) + 1);
   }
 
-  // Steg 4: Lägg in `fileCount` på varje task
   const tasksWithFileCount = chain.tasks.map((task) => ({
     ...task,
     fileCount: fileCountPerTask.get(task.id) ?? 0,
@@ -273,31 +272,29 @@ export default function ChainView() {
 
   return (
     <>
-      <Outlet />
       <div className="space-y-2 bg-black text-white min-h-screen pl-2 pr-2 pt-20 pb-20">
         <div className="flex items-center justify-between px-2">
-          {/* vänster: tillbaka + titel */}
           <div className="flex items-center gap-2">
+            {" "}
             <Link
               to="/chains"
               prefetch="intent"
-              className="block text-base md:text-sm mt-1 text-gray-400 hover:text-white"
+              className="block text-base md:text-sm text-gray-400 hover:text-white"
             >
               <span className="text-xl md:text-base leading-none pr-1">←</span>
               Tillbaka
             </Link>
-            <h2 className="text-xl font-bold mb-2 text-white md:pl-2">
+            <h2 className="text-xl font-bold text-white md:pl-2">
               {chain.name}
             </h2>
           </div>
           <Link
-            to={`/chains/${chain.id}/edit`}
+            to={`/chain/${chain.id}/edit`}
             prefetch="intent"
             title="Redigera flöde"
             className="p-2 rounded-full bg-zinc-800 text-gray-400 hover:text-white hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
           >
             <svg
-              xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="currentColor"
               className="w-4 h-4"
@@ -319,6 +316,7 @@ export default function ChainView() {
           </div>
         ))}
       </div>
+      <Outlet />
     </>
   );
 }
