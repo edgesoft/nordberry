@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,8 +12,8 @@ datasource db {
 
 model User {
   id          String     @id @default(cuid())
-  clerkUserId String?    @unique
-  email       String     @unique
+  clerkUserId String?    @unique // @unique skapar automatiskt ett index
+  email       String     @unique // @unique skapar automatiskt ett index
   name        String?
   imageUrl    String?
   status      UserStatus @default(invited)
@@ -30,6 +27,10 @@ model User {
   taskUsers   TaskUser[]
   comments    Comment[]
   files       File[]
+
+  // Index för att snabbt hitta användare baserat på status eller roll om det behövs
+  @@index([status])
+  @@index([role])
 }
 
 enum UserStatus {
@@ -50,11 +51,12 @@ model Project {
   description String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  deletedAt   DateTime? // Överväg index om du ofta filtrerar på detta
 
   // Relations
-  // Om ett projekt tas bort, tas även dess kedjor bort.
   chains      Chain[]
+
+  @@index([deletedAt]) // Om du ofta hämtar icke-raderade projekt
 }
 
 model Chain {
@@ -65,15 +67,18 @@ model Chain {
   deletedAt   DateTime?
 
   projectId   String
-  // Om ett projekt tas bort, tas även denna kedja bort.
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   ownerId     String
-  // Förhindra radering av User om de fortfarande äger en Chain.
   owner       User      @relation("ChainOwner", fields: [ownerId], references: [id], onDelete: Restrict)
 
-  // Om en kedja tas bort, tas även dess Tasks bort.
   tasks       Task[]
+
+  // Index för främmande nycklar och ev. filtrering/sortering
+  @@index([projectId])
+  @@index([ownerId])
+  @@index([deletedAt]) // Om du ofta hämtar icke-raderade kedjor
+  @@index([createdAt]) // Om du ofta sorterar kedjor efter datum
 }
 
 model Task {
@@ -84,22 +89,25 @@ model Task {
   status        TaskStatus @default(pending)
 
   chainId       String
-  // Om en kedja tas bort, tas även denna Task bort.
   chain         Chain      @relation(fields: [chainId], references: [id], onDelete: Cascade)
 
-  // Om en Task tas bort, tas dess assignments och comments bort (via cascade i TaskUser/Comment).
   assignments   TaskUser[]
   comments      Comment[]
 
-  // Self-referencing many-to-many dependency (utan explicit pivot)
-  // Standard onDelete här är oftast Restrict/NoAction, vilket är säkrast
-  // för att undvika oavsiktliga massraderingar via beroenden.
   dependencies  Task[]     @relation("TaskDependencies")
   dependedOnBy  Task[]     @relation("TaskDependencies")
 
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
-  deletedAt     DateTime?
+  deletedAt     DateTime? // Överväg index om du ofta filtrerar
+
+  // Index för främmande nyckel, status, sortering och datum
+  @@index([chainId])
+  @@index([status])
+  @@index([deletedAt]) // Om du ofta hämtar icke-raderade tasks
+  @@index([createdAt]) // Om du ofta sorterar tasks efter datum
+  // Compound index för att hämta tasks i en kedja och sortera dem effektivt
+  @@index([chainId, sortOrder])
 }
 
 model TaskUser {
@@ -111,29 +119,37 @@ model TaskUser {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Om en Task tas bort, tas denna TaskUser-koppling bort.
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  // Förhindra radering av User om de fortfarande har en TaskUser-koppling.
   user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
 
+  // @@unique skapar redan ett effektivt index för att hitta en specifik koppling
+  // och förhindrar dubbletter.
   @@unique([taskId, userId])
+  // Separata index kan vara bra om du ofta söker alla tasks för en user, eller alla users för en task
+  @@index([userId])
+  @@index([taskId]) // Redan täckt av unique-indexet, men skadar inte att vara explicit
 }
 
 model Comment {
   id        String   @id @default(cuid())
   content   String
   createdAt DateTime @default(now())
-  deletedAt DateTime?
+  deletedAt DateTime? // Fält för mjuk radering
   taskId    String
   userId    String
 
-  // Om en Task tas bort, tas denna kommentar bort.
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  // Förhindra radering av User om de fortfarande har skrivit denna kommentar.
   user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  // Om en kommentar tas bort, tas dess filer bort.
   files     File[]
+
+  // Index för främmande nycklar, soft delete och sortering
+  @@index([taskId])
+  @@index([userId])
+  @@index([deletedAt]) // MYCKET VIKTIGT för att snabbt hitta icke-raderade
+  @@index([createdAt]) // För sortering
+  // Compound index för att snabbt hämta icke-raderade kommentarer för en task, sorterat
+  @@index([taskId, deletedAt, createdAt])
 }
 
 model File {
@@ -145,24 +161,26 @@ model File {
   userId    String
   source    FileSource @default(S3)
 
-  // Om en kommentar tas bort, tas denna fil bort.
   comment   Comment    @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  // Förhindra radering av User om de fortfarande äger denna fil.
   user      User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  // Index för främmande nycklar
+  @@index([commentId])
+  @@index([userId])
+  @@index([createdAt]) // Om du sorterar filer efter datum
 }
 
+// --- Enums oförändrade ---
 enum TaskRole {
   worker
   approver
   viewer
 }
-
 enum TaskStatus {
   pending
   working
   done
 }
-
 enum FileSource {
   S3
   SHAREPOINT
