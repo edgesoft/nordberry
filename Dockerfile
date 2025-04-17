@@ -9,7 +9,6 @@ RUN rm -f package-lock.json && npm install --legacy-peer-deps
 
 COPY . .
 
-RUN npx prisma migrate
 RUN npx prisma generate
 
 # 💥 Rebuild native deps like rollup
@@ -28,4 +27,4 @@ COPY --from=builder /app .
 ENV NODE_ENV=production
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
