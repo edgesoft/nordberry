@@ -31,6 +31,7 @@ export default function NewChain() {
     <ChainEditor
       onClose={() => navigate("/chains")}
       initialName="Nytt flöde"
+       mode="create"
       initialSteps={[]}
       onSave={createChain}
     />
