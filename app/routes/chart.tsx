@@ -94,49 +94,6 @@ const OrgBox = ({
   );
 };
 
-// --- Person Definitioner ---
-
-const PERSON_KALLE_KOORDINATOR = { name: "Anastasios Pennou", verified: false };
-const PERSON_ASSAR_ASSISTENT = { name: "Assar Assistent", verified: false };
-const PERSON_ANNA_ANDERSSON = { name: "Anna Andersson", verified: true };
-const PERSON_BO_BENGTSSON = { name: "Bo Bengtsson", verified: true };
-const PERSON_STINA_SVENSSON = { name: "Stina Svensson", verified: false };
-const PERSON_CECILIA_CEDER = { name: "Cecilia Ceder", verified: false };
-const PERSON_DAVID_DAHL = { name: "David Dahl", verified: true };
-const PERSON_ERIK_ERIKSSON = { name: "Erik Eriksson", verified: false };
-const PERSON_EVA_EK = { name: "Eva Ek", verified: true };
-const PERSON_FIA_FAGER = { name: "Fia Fager", verified: true };
-const PERSON_FRIDA_FLINK = { name: "Frida Flink", verified: false };
-const PERSON_RUTGER_ROOMING = { name: "Rutger Rooming", verified: true };
-const PERSON_GUSTAV_GRAN = { name: "Gustav Gran", verified: true };
-const PERSON_HANNA_HOLM = { name: "Hanna Holm", verified: false };
-const PERSON_IVAR_ISAKSSON = { name: "Ivar Isaksson", verified: true };
-const PERSON_JENNY_JANSSON = { name: "Jenny Jansson", verified: true };
-const PERSON_KARL_KARLSSON = { name: "Karl Karlsson", verified: false };
-const PERSON_LINA_LIND = { name: "Lina Lind", verified: true };
-const PERSON_MATS_MARTINSSON = { name: "Mats Martinsson", verified: true };
-const PERSON_NINA_NILSSON = { name: "Nina Nilsson", verified: false };
-const PERSON_OLA_OLSSON = { name: "Ola Olsson", verified: true };
-const PERSON_PETRA_PERSSON = { name: "Petra Persson", verified: true };
-const PERSON_QUENTIN_QVIST = { name: "Quentin Qvist", verified: false };
-const PERSON_RITA_RASK = { name: "Rita Rask", verified: true };
-const PERSON_SIMON_STAL = { name: "Simon Stål", verified: false };
-const PERSON_TOVE_TRAD = { name: "Tove Träd", verified: true };
-const PERSON_HANS_HC_ETT = { name: "Hans HC-Ett", verified: true };
-const PERSON_ASTA_ASSISTENT_ETT = { name: "Asta Assistent Ett", verified: true };
-const PERSON_URBAN_UDD = { name: "Urban Udd", verified: true };
-const PERSON_VERA_VIK = { name: "Vera Vik", verified: false };
-const PERSON_WILMA_WALLIN = { name: "Wilma Wallin", verified: true };
-const PERSON_HELGA_HC_TVA = { name: "Helga HC-Två", verified: false };
-const PERSON_YLVA_YMER = { name: "Ylva Ymer", verified: false };
-const PERSON_LANGT_NAMN = { name: "Ett Mycket", verified: true };
-const PERSON_ZATA_ZORRO = { name: "Zäta Zorro", verified: true };
-const PERSON_AKE_ABERG = { name: "Åke Åberg", verified: false };
-const PERSON_HENRIK_HC_TRE = { name: "Henrik HC-Tre", verified: true };
-const PERSON_BOSSE_BITRADE_TRE = { name: "Bosse Biträde Tre", verified: false };
-const PERSON_ARLIG_ADEL = { name: "Ärlig Ädel", verified: true };
-const PERSON_OSTEN_ORN = { name: "Östen Örn", verified: false };
-const PERSON_ADAM_ALM = { name: "Adam Alm", verified: true };
 
 // --- Organisationsdata ---
 
@@ -145,7 +102,7 @@ const conventionCommitteeData = {
   coordinator: {
     title: "Conv. Comm. Coordinator",
     people: [ { name: "Jan Kraft", verified: true }],
-    assistantPeople: [{name: "Seth Johansson", verified: true}],
+    assistantPeople: [{name: "Magnus Linderoth", verified: true}],
     roleTitle: "CCC",
     assistantRoleTitle: "CCCA",
     departments: [
@@ -168,8 +125,8 @@ const conventionCommitteeData = {
   },
   roomingOverseer: {
     title: "Rooming Overseer",
-    people: [{ name: "Mikael Vähäkari", verified: true }],
-    assistantPeople: [{ name: "Daniel Nilsson", verified: true }],
+    people: [{ name: "Mikael Vähäkari", verified: true } ],
+    assistantPeople: [{ name: "Tobias Wright", verified: true} ],
     roleTitle: "RO",
     assistantRoleTitle: "ROA",
     departments: [
@@ -207,19 +164,19 @@ const hospitalityCommitteeData = {
   hc1: {
     title: "HC-1",
     people: [{ name: "Lars Brorsson", verified: true }],
-    assistantPeople: [ {name: "Robert Claeson", verified: true }],
+    assistantPeople: [ {name: "Robert Claeson", verified: true }, {name: "Dennis Greus", verified: true }],
     roleTitle: "HC-1",
     assistantRoleTitle: "HCA-1",
     departments: [
       { title: "Airports", people: [] },
-      { title: "Delegate Rooming", people: [{ name: "Raymond Beaini", verified: true }] },
+      { title: "Delegate Rooming", people: [{ name: "Raymond Beaini", verified: false }] },
       { title: "Transportation", people: [] },
     ],
   },
   hc2: {
     title: "HC-2",
     people: [{ name: "Benjamin Hugó", verified: true }],
-    assistantPeople: [{ name: "Tobias Wright", verified: true }],
+    assistantPeople: [{name: "Alexander Tripkous", verified: true }],
     roleTitle: "HC-2",
     assistantRoleTitle: "HCA-2",
     departments: [
@@ -231,12 +188,12 @@ const hospitalityCommitteeData = {
   hc3: {
     title: "HC-3",
     people: [{name: "Björn Gullberg", verified: true}],
-    assistantPeople: [{name: "Dennis Greus", verified: true}],
+    assistantPeople: [{name: "Daniel Leidstedt", verified: true}],
     roleTitle: "HC-3",
     assistantRoleTitle: "HCA-3",
     departments: [
-      { title: "Delegate Management", people: [] },
-      { title: "Volunteer Management", people: [] },
+      { title: "Delegate Management", people: [ {name: "Mikael Jonsson", verified: false}] },
+      { title: "Volunteer Management", people: [{name: "Mikael Jonsson", verified: false}] },
       { title: "Safety", people: [{name: "Peter Johansson", verified: false}] },
     ],
   },
