@@ -424,6 +424,7 @@ const Header = () => {
                       <Link
                         key={task.id}
                         to={`/task/${task.id}`} // Navigera till task
+                        prefetch="intent"
                         onClick={() => {
                           setSearchQuery(""); // Rensa sökfältet vid val
                           setSearchResults([]); // Stäng resultaten
