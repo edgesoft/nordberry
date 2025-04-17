@@ -256,7 +256,7 @@ export function ChainEditor({
 
   /* ---------- render ---------- */
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center sm:px-4 z-50">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center sm:px-4 z-50">
       <div
         ref={modalRef}
         className="bg-[#121212] text-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
@@ -294,6 +294,15 @@ export function ChainEditor({
           )}
           <button
             onClick={() => {
+              setStepFlow(1); // Återställ till första steget (eller ett neutralt värde om du har det)
+              setEditStepId(null); // Återställ ev. redigerat steg
+              setCurrentStep({ // Rensa nuvarande steg-data
+                  title: "",
+                  dependencies: [],
+                  assignees: [],
+                  status: "pending",
+              });
+              // Anropa sedan förälderns onClose
               onClose();
             }}
             className="p-2 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500"
