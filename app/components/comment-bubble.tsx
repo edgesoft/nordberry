@@ -1,8 +1,10 @@
 import { useLongHoverPress } from "../hooks/useLongHoverPress";
 import Avatar from "../components/avatar";
 import { useFetcher } from "@remix-run/react";
-import toast from 'react-hot-toast';
+import toast from "react-hot-toast";
 import { sourceMatchers } from "~/utils/sourceMatcher";
+import { useState, useEffect } from "react";
+import { type FetcherWithComponents } from "@remix-run/react";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -17,6 +19,82 @@ function timeAgo(date: Date): string {
   return rtf.format(-days, "day");
 }
 
+export const DeleteUndoToast = ({
+  t,
+  commentId,
+  onUndoSuccess,
+}: {
+  t: Toast;
+  commentId: string;
+  onUndoSuccess: () => void;
+}) => {
+  const undoFetcher = useFetcher();
+
+  const handleUndo = () => {
+  
+    undoFetcher.submit(null, {
+      method: "post",
+      action: `/api/comments/${commentId}/undo-delete`, // Din Ångra-action
+    });
+    toast.dismiss(t.id); // Stäng toasten när Ångra klickas
+  };
+
+  // Om ångra-anropet lyckas, kör onUndoSuccess callback
+  useEffect(() => {
+    if (undoFetcher.state === "idle" && undoFetcher.data?.success) {
+      onUndoSuccess();
+    }
+    // Här kan du också hantera ev. fel vid undoFetcher.data?.error
+  }, [undoFetcher.state, undoFetcher.data, onUndoSuccess]);
+
+  return (
+    <div
+      className={`${
+        t.visible ? "animate-enter" : "animate-leave"
+      } max-w-md w-full bg-zinc-900 shadow-lg rounded-xl pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+    >
+      <div className="flex-1 w-0 p-2">
+        <div className="flex items-start gap-2">
+          <div className="text-orange-200 rounded-full bg-zinc-950 p-[6px] flex items-center justify-center">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+              <path d="M11 3a1 1 0 0 1 2 0v10a1 1 0 0 1-2 0V3zm1 16a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" />
+            </svg>
+          </div>
+
+          <div className="flex flex-col">
+            <p className="text-sm font-semibold text-white py-2">
+              Kommentar borttagen
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center border-l border-zinc-950 p-2">
+        <button
+          onClick={() => {
+            handleUndo();
+            toast.remove(t.id);
+          }}
+          className="p-2 rounded-full bg-zinc-800 text-zinc-400 hover:text-white transition"
+          aria-label="Ångra"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            className="w-4 h-4"
+            strokeWidth={1.8}
+            fill="none"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 14l-4-4m0 0l4-4m-4 4h11a4 4 0 010 8h-1"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+};
 
 function renderCommentWithLinks(text: string): React.ReactNode {
   let remaining = text;
@@ -74,67 +152,43 @@ function renderCommentWithLinks(text: string): React.ReactNode {
   return result;
 }
 
-const notify = () =>
-  toast.custom((t) => (
-    <div
-      className={`${
-        t.visible ? "animate-enter" : "animate-leave"
-      } max-w-md w-full bg-zinc-900 shadow-lg rounded-xl pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
-    >
-      <div className="flex-1 w-0 p-4">
-        <div className="flex items-center gap-3">
-          <img
-            className="h-10 w-10 rounded-full object-cover"
-            src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixqx=6GHAjsWpt9&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2.2&w=160&h=160&q=80"
-            alt=""
-          />
-          <div className="flex flex-col">
-            <p className="text-sm font-semibold text-white">Emilia Gates</p>
-            <p className="text-sm text-zinc-400">Sure! 8:30pm works great!</p>
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center border-l border-zinc-950 px-2">
-        <button
-          onClick={() => toast.dismiss(t.id)}
-          className="p-2 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-          aria-label="Close"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
-    </div>
-  ));
 
 export function CommentBubble({
   comment,
   prevUserId,
   dbUserId,
+  deleteFetcher
 }: {
   comment: any;
   prevUserId?: string;
   dbUserId?: string;
+  deleteFetcher: FetcherWithComponents<{ success: boolean; deletedCommentId?: string; error?: string }>; 
 }) {
   const isSameUser = prevUserId === comment.user.id;
   const isMine = comment.user.id === dbUserId;
 
-  const fetcher = useFetcher();
+  const [isVisible, setIsVisible] = useState(true);
   const { activeId, bind } = useLongHoverPress(500);
   const bindProps = bind(comment.id);
   const showDelete = activeId === comment.id;
+
+
+  const handleDeleteClick = () => {
+    // 1. Optimistisk UI-uppdatering: Dölj direkt
+    setIsVisible(false);
+
+    // 2. Skicka formuläret för mjuk radering
+    deleteFetcher.submit(null, {
+      // Skicka med submit istället för Form's default
+      method: "post",
+      action: `/api/comments/${comment.id}/soft-delete`,
+    });
+  };
+
+  // Om inte synlig (pga optimistisk radering), rendera ingenting
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <div
@@ -179,21 +233,19 @@ export function CommentBubble({
       {/* Papperskorgen */}
       {isMine && showDelete && (
         <div className="absolute -left-0.5 top-0 z-50">
-          <fetcher.Form method="post" action={`/comments/${comment.id}/delete`}>
-            <button
-              type="submit"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                notify()
-              }}
-              className="block text-left px-2 py-2 text-sm text-zinc-400 hover:text-zinc-500 bg-zinc-800 rounded-full shadow-lg"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                <path d="M22 5a1 1 0 0 1-1 1H3a1 1 0 0 1 0-2h5V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1h5a1 1 0 0 1 1 1ZM4.934 21.071 4 8h16l-.934 13.071a1 1 0 0 1-1 .929H5.931a1 1 0 0 1-.997-.929ZM15 18a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Z" />
-              </svg>
-            </button>
-          </fetcher.Form>
+          <button
+            type="submit"
+            onClick={(e) => {
+              e.stopPropagation();
+              // Ta bort preventDefault om du inte behöver det för annat
+              handleDeleteClick(); // Anropa den nya funktionen
+            }}
+            className="block text-left px-2 py-2 text-sm text-zinc-400 hover:text-zinc-500 bg-zinc-800 rounded-full shadow-lg"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+              <path d="M22 5a1 1 0 0 1-1 1H3a1 1 0 0 1 0-2h5V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1h5a1 1 0 0 1 1 1ZM4.934 21.071 4 8h16l-.934 13.071a1 1 0 0 1-1 .929H5.931a1 1 0 0 1-.997-.929ZM15 18a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Z" />
+            </svg>
+          </button>
         </div>
       )}
     </div>

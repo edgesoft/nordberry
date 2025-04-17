@@ -1,4 +1,4 @@
-import { useLoaderData, Link, useFetcher, useMatches } from "@remix-run/react";
+import { useLoaderData, Link, useFetcher, useMatches, useRevalidator } from "@remix-run/react";
 import { prisma } from "../utils/db.server";
 import { json } from "@remix-run/node";
 import { useState, useEffect } from "react";
@@ -10,8 +10,9 @@ import { requireUser } from "../utils/auth.server";
 import RevokeApprovalButton from "../components/revoke-approval-button";
 import { FileUploader } from "../components/file-upload";
 import { useNordEvent } from "../hooks/useNordEvent";
-import { CommentBubble } from "../components/comment-bubble";
+import { CommentBubble, DeleteUndoToast } from "../components/comment-bubble";
 import { sourceMatchers } from "~/utils/sourceMatcher";
+import toast from "react-hot-toast";
 
 export const loader = async (args) => {
   await requireUser(args, { requireActiveStatus: true });
@@ -46,6 +47,9 @@ export const loader = async (args) => {
         },
       },
       comments: {
+        where: {
+          deletedAt: null
+        },
         include: {
           user: { select: { id: true, name: true, imageUrl: true } },
           files: true,
@@ -328,13 +332,16 @@ export default function TaskView() {
   });
 
   const [comment, setComment] = useState("");
+  const revalidator = useRevalidator(); // Hämta revalidator
   const { dbUser } = useRootData();
   const fetcher = useFetcher();
+  const commentDeleteFetcher = useFetcher<{ success: boolean; deletedCommentId?: string; error?: string }>();
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const uploadedFiles = uploadingFiles
     .filter((f) => f.uploaded && f.result)
     .map((f) => f.result!) as UploadedFile[];
   const hasUnfinishedUploads = uploadingFiles.some((f) => !f.uploaded);
+  const [toastShownForId, setToastShownForId] = useState<string | null>(null);
 
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success) {
@@ -342,6 +349,48 @@ export default function TaskView() {
       setUploadingFiles([]);
     }
   }, [fetcher.state, fetcher.data]);
+
+  useEffect(() => {
+    const shouldShowToast =
+        commentDeleteFetcher.state === 'idle' &&
+        commentDeleteFetcher.data?.success &&
+        commentDeleteFetcher.data.deletedCommentId &&
+        // *** NYTT VILLKOR: Visa bara om vi INTE redan visat toast för detta ID ***
+        commentDeleteFetcher.data.deletedCommentId !== toastShownForId;
+
+    if (shouldShowToast) {
+      const deletedId = commentDeleteFetcher.data.deletedCommentId;
+      console.log('>>> Triggering UNDO Toast for ID:', deletedId);
+
+      // *** Markera att toasten för detta ID nu visas ***
+      setToastShownForId(deletedId);
+
+      toast.custom((t) => (
+          <DeleteUndoToast
+              t={t}
+              commentId={deletedId}
+              onUndoSuccess={() => {
+                  // När ångra lyckas, kör revalidate
+                  revalidator.revalidate();
+                  // Fundera på om du vill nollställa toastShownForId här,
+                  // troligen inte nödvändigt eftersom deleteFetcher.data
+                  // kommer vara annorlunda vid nästa radering.
+                  // setToastShownForId(null);
+              }}
+          />
+      ), { duration: 5000 });
+
+    }
+    // Hantera ev. fel från delete-action
+    if (commentDeleteFetcher.state === 'idle' && commentDeleteFetcher.data?.error) {
+        // Undvik att visa felmeddelande upprepade gånger också? Kanske inte lika kritiskt.
+        toast.error(`Kunde inte ta bort kommentar: ${commentDeleteFetcher.data.error}`);
+        revalidator.revalidate();
+    }
+    // *** Lägg till toastShownForId i dependency array ***
+  }, [commentDeleteFetcher.state, commentDeleteFetcher.data, revalidator, toastShownForId]);
+
+
 
   useEffect(() => {
     const handler = (event: FocusEvent) => {
@@ -406,37 +455,8 @@ export default function TaskView() {
                     comment={comment}
                     dbUserId={dbUser?.id}
                     prevUserId={prev && prev.user.id}
-                    onDelete={
-                      comment.user.id === dbUser?.id
-                        ? () => (
-                            <div className="absolute -left-0.5 top-0 z-50">
-                              <fetcher.Form
-                                method="post"
-                                action={`/comments/${comment.id}/delete`}
-                              >
-                                <button
-                                  type="submit"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                  
-                                  }}
-                                
-                                  className="block text-left px-2 py-2 text-sm text-zinc-400 hover:text-red-500 bg-zinc-800 rounded-full shadow-lg"
-                                >
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                    className="w-5 h-5"
-                                  >
-                                    <path d="M22 5a1 1 0 0 1-1 1H3a1 1 0 0 1 0-2h5V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1h5a1 1 0 0 1 1 1ZM4.934 21.071 4 8h16l-.934 13.071a1 1 0 0 1-1 .929H5.931a1 1 0 0 1-.997-.929ZM15 18a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Z" />
-                                  </svg>
-                                </button>
-                              </fetcher.Form>
-                            </div>
-                          )
-                        : undefined
-                    }
+                    deleteFetcher={commentDeleteFetcher}
+                    
                   />
                 );
               })}
