@@ -14,19 +14,19 @@ datasource db {
 }
 
 model User {
-  id          String    @id @default(cuid())
-  clerkUserId String?   @unique
-  email       String    @unique
+  id          String     @id @default(cuid())
+  clerkUserId String?    @unique
+  email       String     @unique
   name        String?
-  imageUrl    String? 
+  imageUrl    String?
   status      UserStatus @default(invited)
   role        UserRole   @default(executor)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  // Relations
-  chains      Chain[]      @relation("ChainOwner")
+  // Relations - onDelete styrs från de relaterade modellerna nedan
+  chains      Chain[]    @relation("ChainOwner")
   taskUsers   TaskUser[]
   comments    Comment[]
   files       File[]
@@ -53,6 +53,7 @@ model Project {
   deletedAt   DateTime?
 
   // Relations
+  // Om ett projekt tas bort, tas även dess kedjor bort.
   chains      Chain[]
 }
 
@@ -64,74 +65,89 @@ model Chain {
   deletedAt   DateTime?
 
   projectId   String
-  project     Project   @relation(fields: [projectId], references: [id])
+  // Om ett projekt tas bort, tas även denna kedja bort.
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   ownerId     String
-  owner       User      @relation("ChainOwner", fields: [ownerId], references: [id])
+  // Förhindra radering av User om de fortfarande äger en Chain.
+  owner       User      @relation("ChainOwner", fields: [ownerId], references: [id], onDelete: Restrict)
 
+  // Om en kedja tas bort, tas även dess Tasks bort.
   tasks       Task[]
 }
 
 model Task {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  sortOrder   Int?
-  status      TaskStatus @default(pending)
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  sortOrder     Int?
+  status        TaskStatus @default(pending)
 
-  chain       Chain    @relation(fields: [chainId], references: [id])
-  chainId     String
+  chainId       String
+  // Om en kedja tas bort, tas även denna Task bort.
+  chain         Chain      @relation(fields: [chainId], references: [id], onDelete: Cascade)
 
-  assignments TaskUser[]
-  comments    Comment[]
+  // Om en Task tas bort, tas dess assignments och comments bort (via cascade i TaskUser/Comment).
+  assignments   TaskUser[]
+  comments      Comment[]
 
-  // Self-referencing many-to-many dependency (without explicit pivot)
-  dependencies  Task[] @relation("TaskDependencies")
-  dependedOnBy  Task[] @relation("TaskDependencies")
+  // Self-referencing many-to-many dependency (utan explicit pivot)
+  // Standard onDelete här är oftast Restrict/NoAction, vilket är säkrast
+  // för att undvika oavsiktliga massraderingar via beroenden.
+  dependencies  Task[]     @relation("TaskDependencies")
+  dependedOnBy  Task[]     @relation("TaskDependencies")
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
 }
 
 model TaskUser {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   taskId    String
   userId    String
   role      TaskRole
-  approved  Boolean   @default(false)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  task      Task      @relation(fields: [taskId], references: [id])
-  user      User      @relation(fields: [userId], references: [id])
+  // Om en Task tas bort, tas denna TaskUser-koppling bort.
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  // Förhindra radering av User om de fortfarande har en TaskUser-koppling.
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([taskId, userId])
 }
 
 model Comment {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   content   String
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
   taskId    String
   userId    String
 
-  task      Task      @relation(fields: [taskId], references: [id])
-  user      User      @relation(fields: [userId], references: [id])
-  files     File[]   
+  // Om en Task tas bort, tas denna kommentar bort.
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  // Förhindra radering av User om de fortfarande har skrivit denna kommentar.
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  // Om en kommentar tas bort, tas dess filer bort.
+  files     File[]
 }
 
 model File {
-  id         String    @id @default(cuid())
-  url        String
-  name       String
-  createdAt  DateTime  @default(now())
-  commentId  String
-  userId     String
-  source     FileSource @default(S3)
+  id        String     @id @default(cuid())
+  url       String
+  name      String
+  createdAt DateTime   @default(now())
+  commentId String
+  userId    String
+  source    FileSource @default(S3)
 
-  comment    Comment   @relation(fields: [commentId], references: [id])
-  user       User      @relation(fields: [userId], references: [id])
+  // Om en kommentar tas bort, tas denna fil bort.
+  comment   Comment    @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  // Förhindra radering av User om de fortfarande äger denna fil.
+  user      User       @relation(fields: [userId], references: [id], onDelete: Restrict)
 }
 
 enum TaskRole {
