@@ -9,6 +9,7 @@ RUN rm -f package-lock.json && npm install --legacy-peer-deps
 
 COPY . .
 
+RUN npx prisma migrate
 RUN npx prisma generate
 
 # 💥 Rebuild native deps like rollup
