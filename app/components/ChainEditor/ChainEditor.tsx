@@ -1,7 +1,5 @@
-/* app/components/ChainEditor/ChainEditor.tsx */
 import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
-
 import { StepList } from "../StepList/StepList";
 import { AssigneeSelector } from "../selectors/AssigneeSelector";
 import { DependencySelector } from "../selectors/DependencySelector";
@@ -30,19 +28,16 @@ export function ChainEditor({
   mode,
   onSave,
 }: ChainEditorProps) {
-  /* ---------- state ---------- */
+
   const [chainName, setChainName] = useState(initialName);
   const [hasTouchedName, setHasTouchedName] = useState(false);
   const [stepFlow, setStepFlow] = useState(1);
-
   const [stepList, setStepList] = useState<Step[]>(initialSteps);
   const [editingName, setEditingName] = useState(false);
-
   const chainNameInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const dependencyDropdownRef = useRef<HTMLDivElement>(null);
   const stepTitleInputRef = useRef<HTMLInputElement>(null);
-
   const [editStepId, setEditStepId] = useState<string | null>(null);
   const [deletedSteps, setDeletedSteps] = useState<string[]>([]);
 
@@ -53,7 +48,7 @@ export function ChainEditor({
     status: "pending",
   });
 
-  /* ---------- escape + click‑outside ---------- */
+
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", esc);
@@ -81,7 +76,7 @@ export function ChainEditor({
     return () => document.removeEventListener("mousedown", click);
   }, [onClose, hasTouchedName, currentStep, stepList]);
 
-  /* ---------- steg‑CRUD ---------- */
+
   function handleEditStep(step: Step | null) {
     if (!step) {
       setEditStepId(null);
@@ -254,14 +249,13 @@ export function ChainEditor({
     (s, i) => i < currentIndex && s.id !== editStepId
   );
 
-  /* ---------- render ---------- */
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center sm:px-4 z-50">
       <div
         ref={modalRef}
         className="bg-[#121212] text-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
       >
-        {/* header */}
         <div
           className="flex items-center justify-between px-4 py-4 border-b border-[#2a2a2a]"
           onClick={() => {
@@ -302,8 +296,9 @@ export function ChainEditor({
                   assignees: [],
                   status: "pending",
               });
-              // Anropa sedan förälderns onClose
-              onClose();
+              requestAnimationFrame(() => {
+                onClose();
+              });
             }}
             className="p-2 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500"
             aria-label="Close"
