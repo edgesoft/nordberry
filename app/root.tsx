@@ -15,6 +15,7 @@ import tailwindStylesheetUrl from "./tailwind.css?url";
 import Header from "./components/header";
 import NotFound from "./routes/_404";
 import toast, { Toaster } from "react-hot-toast";
+import { getFilterStatuses } from "./utils/filter.server";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: tailwindStylesheetUrl },
@@ -85,6 +86,9 @@ export const loader: LoaderFunction = (args) => {
         })
       : null;
 
+    const statuses = await getFilterStatuses(request);
+ 
+
     let pendingApprovalCount = 0;
     if (dbUser?.role === 'admin') {
       pendingApprovalCount = await prisma.user.count({
@@ -99,7 +103,8 @@ export const loader: LoaderFunction = (args) => {
       dbUser,
       baseUrl,
       timestamp: Date.now(),
-      pendingApprovalCount
+      pendingApprovalCount,
+      statuses
     };
   });
 };
@@ -140,6 +145,7 @@ export function ErrorBoundary() {
 }
 
 export function App() {
+
   return (
     <html lang="sv" className="bg-black">
       <head>
@@ -149,17 +155,20 @@ export function App() {
         <Links />
       </head>
       <body className="bg-black">
-        <div className="fixed top-0 left-0 right-0 z-50 bg-black">
-          <Header />
-        </div>
-        <Outlet />
+          <div className="fixed top-0 left-0 right-0 z-50 bg-black">
+            <Header />
+          </div>
+          <Outlet />
         <Toaster />
         <ScrollRestoration />
         <Scripts />
+         
       </body>
     </html>
   );
 }
+
+
 
 export default ClerkApp(App, {
   appearance: { baseTheme: dark },
