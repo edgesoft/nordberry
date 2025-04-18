@@ -4,45 +4,53 @@ import { json } from "@remix-run/node";
 import TaskStep from "../components/task-step";
 import { requireUser } from "../utils/auth.server";
 import { useNordEvent } from "../hooks/useNordEvent";
+import { Statuses } from "~/types/filterStatusTypes";
+import { getFilterStatuses } from "~/utils/filter.server";
 
 export async function loader(args: LoaderArgs) {
   const dbUser = await requireUser(args, { requireActiveStatus: true });
+  const {request} = args
 
+  const rawStatuses: Statuses = await getFilterStatuses(request);
+
+  // 3) Bygg en lista med de status‐nycklar som är "på"
+  const activeStatuses = (Object.entries(rawStatuses) as [string, boolean][])
+    .filter(([, isOn]) => isOn)
+    .map(([status]) => status);
+
+  // 4) Hämta kedjor med Prisma, filtrera både vilka chains
+  //    som har uppgifter för den inloggade användaren OCH
+  //    att uppgifterna har en status i activeStatuses
   const chains = await prisma.chain.findMany({
     where: {
       tasks: {
-        // Filter chains based on tasks
         some: {
-          // Where at least one task...
+          status: { in: activeStatuses },
           assignments: {
-            // ...has assignments (TaskUser records)...
-            some: {
-              // ...where at least one assignment...
-              userId: dbUser.id, // ...matches the logged-in user's ID.
-            },
+            some: { userId: dbUser.id },
           },
         },
       },
     },
-    orderBy: {
-      createdAt: "desc", // Sortera kedjor efter createdAt (senaste först)
-    },
-    // Behåll 'include' om du fortfarande vill ha med alla tasks för de filtrerade kedjorna
+    orderBy: { createdAt: "desc" },
     include: {
       tasks: {
         orderBy: { sortOrder: "asc" },
         include: {
-          // OCH inom varje task, inkludera...
           assignments: {
-            // ...dess assignments
-            select: { userId: true }, // ...och välj bara userId från dem
+            select: { userId: true },
           },
         },
       },
     },
   });
 
-  return json({ chains, dbUser });
+  // 5) Returnera både kedjor, användare och de råa status‐värdena
+  return json({
+    chains,
+    dbUser,
+    statuses: rawStatuses,
+  });
 }
 
 export function EmptyChainsPanel() {

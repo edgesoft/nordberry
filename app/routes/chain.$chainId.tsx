@@ -86,7 +86,6 @@ export const loader = async (args: LoaderFunctionArgs) => {
     },
   });
 
-
   const fileCountPerTask = new Map<string, number>();
 
   for (const file of fileTaskLinks) {
@@ -274,34 +273,37 @@ export default function ChainView() {
     <>
       <div className="space-y-2 bg-black text-white min-h-screen pl-2 pr-2 pt-20 pb-20">
         <div className="flex items-center justify-between px-2">
-          <div className="flex items-center gap-2">
-            {" "}
+          <div className="flex flex-wrap md:flex-nowrap items-center md:gap-4 mb-2 w-full">
+            {/* Tillbaka-länk: Alltid först visuellt */}
             <Link
-              to="/chains"
+              to={`/chains`}
               prefetch="intent"
-              className="block text-base md:text-sm text-gray-400 hover:text-white"
+              className="text-sm text-gray-400 hover:text-white order-1" // order-1 säkerställer att den är först i flödet
             >
-              <span className="text-xl md:text-base leading-none pr-1">←</span>
+              <span className="text-xl leading-none pr-1">←</span>
               Tillbaka
             </Link>
-            <h2 className="text-xl font-bold text-white md:pl-2">
+
+            {/* Rubrik: Placeras under på mobil, bredvid Tillbaka på desktop */}
+            <h1 className="text-white text-lg font-semibold order-3 md:order-2 w-full md:w-auto mt-1 md:mt-0 md:mr-auto">
+              {" "}
+              {/* order-3 & w-full för mobil wrap. order-2 & md:mr-auto för desktop layout */}
               {chain.name}
-            </h2>
-          </div>
-          <Link
-            to={`/chain/${chain.id}/edit`}
-            prefetch="intent"
-            title="Redigera flöde"
-            className="p-2 rounded-full bg-zinc-800 text-gray-400 hover:text-white hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-4 h-4"
+            </h1>
+
+            {/* Redigera-knapp: Högst upp till höger på mobil, längst till höger på desktop */}
+            <Link
+              to={`/chain/${chain.id}/edit`}
+              prefetch="intent"
+              title="Redigera flöde"
+              className="p-2 rounded-full bg-zinc-800 text-gray-400 hover:text-white hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition order-2 md:order-3 ml-auto md:ml-0" // order-2 & ml-auto för mobil högerkant. order-3 & md:ml-0 för desktop (positioneras av h1:s mr-auto)
             >
-              <path d="M15.232 5.232l3.536 3.536m-2.036-5.572a2.5 2.5 0 013.536 3.536L8.5 21H5v-3.5L16.732 3.196z" />
-            </svg>
-          </Link>
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                {/* Ikonens path */}
+                <path d="M15.232 5.232l3.536 3.536m-2.036-5.572a2.5 2.5 0 013.536 3.536L8.5 21H5v-3.5L16.732 3.196z" />
+              </svg>
+            </Link>
+          </div>
         </div>
         {chain.tasks.map((task, i) => (
           <div
