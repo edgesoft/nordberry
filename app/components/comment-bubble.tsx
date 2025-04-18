@@ -223,7 +223,19 @@ export function CommentBubble({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 bg-zinc-800 text-zinc-300 text-xs pr-2 pl-1 py-1 rounded-full hover:bg-zinc-700 transition-colors"
               >
-                {file.name}
+                <svg
+                    className="w-3 h-3 mt-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21 12.79V7a5 5 0 00-10 0v9a3 3 0 006 0V9"
+                    />
+                  </svg>{file.name}
               </a>
             ))}
           </div>
