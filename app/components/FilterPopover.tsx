@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useFetcher, useRouteLoaderData } from "@remix-run/react";
-import { useLocation } from "react-router-dom";
-import OptionToggleDark from "./OptionToggleDark";
+import { useLocation, useNavigate } from "react-router-dom";
 import { FilterStatusKey, Statuses } from "~/types/filterStatusTypes";
 import { ringColors } from "~/utils/colors";
 
@@ -22,33 +21,28 @@ const DEFAULT_STATUSES: Statuses = {
 
 interface FilterPopoverProps {
   isOpen: boolean;
-  onOpen: () => void;
   onClose: () => void;
-  initialStatuses: Statuses;
+  onOpen: () => void;
+  triggerSearch?: () => void;
 }
 
 interface OptionToggleDarkProps {
   label: string;
   selected: boolean;
   onToggle: () => void;
+  status: FilterStatusKey;
 }
 
-export function OptionToggleDark({
-  status,
-  selected,
-  onToggle,
-}: OptionToggleDarkProps) {
+function OptionToggleDark({ status, selected, onToggle }: OptionToggleDarkProps) {
   const dotColor = ringColors[status] || "bg-zinc-600";
   return (
     <div
-      className="flex items-center justify-between px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-900
-        text-xs font-medium text-zinc-300 min-w-[8rem] hover:border-zinc-500 transition"
+      className="flex items-center justify-between w-full px-3 py-2 rounded-md border border-zinc-700 bg-zinc-900 text-sm font-medium text-zinc-200 hover:border-zinc-500 transition"
     >
       <div className="flex items-center gap-2">
         <span className={`h-2 w-2 rounded-full ${dotColor}`} />
         <span>{status}</span>
       </div>
-
       <button
         type="button"
         role="switch"
@@ -71,19 +65,15 @@ export function OptionToggleDark({
   );
 }
 
-export default function FilterPopover({
-  isOpen,
-  onClose,
-  onOpen,
-}: FilterPopoverProps) {
+export default function FilterPopover({ isOpen, onClose, onOpen, triggerSearch }: FilterPopoverProps) {
   const fetcher = useFetcher();
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const { statuses: initialStatuses } = useRouteLoaderData<{
-    statuses: Statuses;
-  }>("root");
+  const { statuses: initialStatuses, dbUser } =
+    useRouteLoaderData<any>("root") || {};
 
-  const [statuses, setStatuses] = useState<Statuses>(initialStatuses);
+  const [statuses, setStatuses] = useState<Statuses>(initialStatuses ?? DEFAULT_STATUSES);
 
   const submit = useCallback(
     (newStatuses: Statuses) => {
@@ -115,35 +105,60 @@ export default function FilterPopover({
   if (!isOpen) return null;
 
   return (
-    <>
-      <div
-        className="absolute right-0 top-full mt-2.5 w-100
-          rounded-lg border border-zinc-700
-          bg-gradient-to-b from-zinc-900/90 to-black/80
-          shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_8px_20px_rgba(0,0,0,0.6)]
-          z-50 overflow-hidden"
-      >
-        <div className="px-2 pt-4 pb-3 border-b border-zinc-800">
-          <h4 className="text-xs font-semibold text-zinc-400 tracking-widest uppercase">
+    <div className="fixed inset-x-2 top-[4rem] mx-auto max-w-3xl rounded-md shadow-xl bg-zinc-900 border border-zinc-900 z-50">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-md shadow-xl bg-zinc-900 border border-zinc-700 overflow-hidden">
+        <div className="p-4">
+          <h4 className="text-xs font-semibold text-zinc-400 tracking-widest uppercase mb-2">
             Filter status
           </h4>
+          <div className="space-y-2">
+            {STATUS_OPTIONS.map(({ key, label }) => (
+              <OptionToggleDark
+                key={key}
+                status={key}
+                selected={statuses[key]}
+                onToggle={() => toggle(key)}
+                label={label}
+              />
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 px-2 py-4">
-          {STATUS_OPTIONS.map(({ key, label }) => (
-            <OptionToggleDark
-              key={key}
-              status={key}
-              selected={statuses[key]}
-              onToggle={() => toggle(key)}
+
+        {dbUser?.role === "admin" && (
+          <div className="p-4 bg-zinc-950 border-t md:border-t-0 md:border-l border-zinc-700">
+            <h4 className="text-xs font-semibold text-zinc-400 tracking-widest uppercase mb-2">
+              Profil
+            </h4>
+            <button
+              onClick={() => {
+                onClose()
+                navigate("/admin/users")}
+              }
+              className="w-full flex items-start gap-3 px-3 py-3 rounded-lg hover:bg-zinc-800 transition text-left"
             >
-              {label}
-            </OptionToggleDark>
-          ))}
-        </div>
-        {fetcher.data?.error && (
-          <p className="px-2 py-1 text-red-400 text-xs">{fetcher.data.error}</p>
+              <div className="p-2 rounded-md bg-zinc-900 border border-zinc-700">
+                <svg
+                  className="w-5 h-5 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5.121 17.804A9 9 0 0112 15a9 9 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+              </div>
+              <div className="flex flex-col text-sm text-white">
+                <span className="font-medium">Användare</span>
+                <span className="text-gray-400 text-xs">Hantera användare och roller</span>
+              </div>
+            </button>
+          </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

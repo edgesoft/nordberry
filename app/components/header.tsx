@@ -51,7 +51,11 @@ function NewUserToastToast({ t, user }: NewUserToastProps) {
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
       </div>
@@ -79,111 +83,30 @@ function UserButtonWithBlur() {
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] transition-opacity duration-150 ease-in-out opacity-100"
           onClick={() => {
-            const btn = document.querySelector("button[class*=userButtonTrigger]");
+            const btn = document.querySelector(
+              "button[class*=userButtonTrigger]"
+            );
             (btn as HTMLElement)?.click();
           }}
         />
       )}
       <div className={`flex items-center ${buttonSizeClasses}`}>
         {!isLoaded ? (
-          <div className={`${buttonSizeClasses} rounded-full bg-gray-700 animate-pulse`} />
+          <div
+            className={`${buttonSizeClasses} rounded-full bg-gray-700 animate-pulse`}
+          />
         ) : (
           <SignedIn>
             <UserButton
               afterSignOutUrl="/sign-in"
-              appearance={{ elements: { userButtonAvatarBox: buttonSizeClasses } }}
+              appearance={{
+                elements: { userButtonAvatarBox: buttonSizeClasses },
+              }}
             />
           </SignedIn>
         )}
       </div>
     </>
-  );
-}
-
-interface MenuDropdownProps {
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  pendingApprovalCount: number;
-}
-
-function MenuDropdown({
-  open,
-  setOpen,
-  pendingApprovalCount,
-}: MenuDropdownProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (open && ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open, setOpen]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="bg-green-700 hover:bg-green-600 text-sm px-4 py-2 rounded text-white font-medium flex items-center gap-1"
-      >
-        Menu
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-        {pendingApprovalCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs font-semibold text-white ring-2 ring-orange-700">
-            {pendingApprovalCount}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <>
-          
-          <div className="fixed bg-zinc-900 right-2 mt-2 w-72 rounded-xl shadow-xl border border-zinc-700 z-50">
-            <div className="p-3">
-              <h3 className="text-xs text-gray-400 uppercase mb-2 px-2">Profil</h3>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  startTransition(() => navigate("/admin/users"));
-                  setOpen(false);
-                }}
-                className="w-full flex items-start gap-3 px-3 py-3 rounded-lg hover:bg-zinc-800 transition text-left"
-              >
-                <div className="p-2 rounded-md bg-zinc-900 border border-zinc-700">
-                  <svg
-                    className="w-5 h-5 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round"
-                          d="M5.121 17.804A9 9 0 0112 15a9 9 0 016.879 2.804M15 
-                             11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div className="flex flex-col text-sm text-white">
-                  <span className="font-medium">Användare</span>
-                  <span className="text-gray-400 text-xs">Hantera användare och roller</span>
-                </div>
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
   );
 }
 
@@ -205,8 +128,6 @@ const Header = () => {
     ? searchResults
     : searchResults.filter((t) => t.canAccess);
 
-
-    
   // Debounce + fetch
   useEffect(() => {
     if (!searchQuery) {
@@ -216,7 +137,9 @@ const Header = () => {
     const timeout = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`/api/tasks?q=${encodeURIComponent(searchQuery)}`);
+        const res = await fetch(
+          `/api/tasks?q=${encodeURIComponent(searchQuery)}`
+        );
         const data = await res.json();
         setSearchResults(data.tasks ?? []);
       } catch (e) {
@@ -232,7 +155,10 @@ const Header = () => {
   // Klick utanför / Escape stänger
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
         setIsFilterOpen(false);
         setSearchResults([]);
       }
@@ -277,7 +203,9 @@ const Header = () => {
     if (!searchQuery) return;
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/tasks?q=${encodeURIComponent(searchQuery)}`);
+      const res = await fetch(
+        `/api/tasks?q=${encodeURIComponent(searchQuery)}`
+      );
       const data = await res.json();
       setSearchResults(data.tasks ?? []);
     } catch {
@@ -291,7 +219,7 @@ const Header = () => {
     <header className="bg-black text-white px-1 py-3 border-b border-gray-800 flex justify-between items-center relative z-40">
       {/* Sök‐overlay dyker upp först när panelen är öppen */}
 
-      {( searchResults.length > 0 || isFilterOpen || open) && (
+      {(searchResults.length > 0 || isFilterOpen || open) && (
         <div
           className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 top-[4.75rem]"
           onClick={() => {
@@ -304,16 +232,23 @@ const Header = () => {
         />
       )}
 
-  
-
       {/* Logo */}
-      <Link to="/" prefetch="intent" className="flex items-center gap-2 min-w-fit min-w-[120px]">
-        <img src="/logo-slick.png" alt="Logo" className="h-12 w-12" loading="eager" />
+      <Link
+        to="/"
+        prefetch="intent"
+        className="flex items-center gap-2  gap-2 min-w-fit"
+      >
+        <img
+          src="/logo-slick.png"
+          alt="Logo"
+          className="h-12 w-12"
+          loading="eager"
+        />
       </Link>
 
-      <div className="flex items-center gap-2 md:gap-2 flex-1 justify-end">
+      <div className="flex items-center gap-2 md:gap-2 flex-1 justify-between">
         {dbUser && dbUser.status === "active" && (
-          <div ref={wrapperRef} className="relative w-full md:max-w-[calc(100vw-130px)]">
+          <div ref={wrapperRef} className="relative w-full ">
             {/* Sökfält */}
             <input
               type="text"
@@ -351,10 +286,19 @@ const Header = () => {
                 <path d="M45,34H28a2,2,0,0,0,0,4H45Z" />
                 <path d="M18,30a6,6,0,0,0-5.65,4H3a2,2,0,0,0,0,4h9.35A6,6,0,1,0,18,30Z" />
               </svg>
+              {pendingApprovalCount > 0 && (
+              <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white ring-2 ring-zinc-900 shadow-sm">
+  {pendingApprovalCount}
+</span>
+              )}
             </button>
             {/* FilterPopover */}
-           
-            <FilterPopover isOpen={isFilterOpen} triggerSearch={triggerSearch} onClose={() => setIsFilterOpen(false)} />
+
+            <FilterPopover
+              isOpen={isFilterOpen}
+              triggerSearch={triggerSearch}
+              onClose={() => setIsFilterOpen(false)}
+            />
 
             {/* Sökresults‐panel */}
             {searchQuery && (visibleResults.length > 0 || isSearching) && (
@@ -383,9 +327,12 @@ const Header = () => {
                           } border border-zinc-700`}
                         />
                         <div className="flex flex-col min-w-0">
-                          <span className="truncate text-sm font-medium">{task.title}</span>
+                          <span className="truncate text-sm font-medium">
+                            {task.title}
+                          </span>
                           <span className="text-xs text-zinc-600 font-mono">
-                            #{task.id.slice(0, 6)} – {task.chain?.name ?? "Okänt flöde"}
+                            #{task.id.slice(0, 6)} –{" "}
+                            {task.chain?.name ?? "Okänt flöde"}
                           </span>
                         </div>
                       </div>
@@ -411,34 +358,27 @@ const Header = () => {
                             {task.title}
                           </span>
                           <span className="text-xs text-zinc-500 font-mono">
-                            #{task.id.slice(0, 6)} – {task.chain?.name ?? "Okänt flöde"}
+                            #{task.id.slice(0, 6)} –{" "}
+                            {task.chain?.name ?? "Okänt flöde"}
                           </span>
                         </div>
                       </Link>
                     );
                   })}
-                  {!isSearching && visibleResults.length === 0 && searchQuery && (
-                    <div className="px-4 py-3 text-sm text-gray-400 md:col-span-2 xl:col-span-3">
-                      Inga resultat hittades.
-                    </div>
-                  )}
+                  {!isSearching &&
+                    visibleResults.length === 0 &&
+                    searchQuery && (
+                      <div className="px-4 py-3 text-sm text-gray-400 md:col-span-2 xl:col-span-3">
+                        Inga resultat hittades.
+                      </div>
+                    )}
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Navigationssektion */}
-        <nav className="flex items-center gap-2 md:gap-2">
-          {dbUser && dbUser.role === "admin" && dbUser.status === "active" && (
-            <MenuDropdown
-              open={open}
-              setOpen={setOpen}
-              pendingApprovalCount={pendingApprovalCount}
-            />
-          )}
-          <UserButtonWithBlur />
-        </nav>
+        <UserButtonWithBlur />
       </div>
     </header>
   );
