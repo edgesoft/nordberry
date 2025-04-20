@@ -57,6 +57,9 @@ export const loader = async (args) => {
         where: {
           deletedAt: null,
         },
+        orderBy: {
+          createdAt: "asc", // eller "desc" om du vill ha senaste först
+        },
         include: {
           user: { select: { id: true, name: true, imageUrl: true } },
           files: true,
@@ -124,6 +127,7 @@ export const action = async (args) => {
       userId: dbUser.id,
     },
   });
+
 
   if (uploadedFiles.length > 0) {
     await prisma.file.createMany({
@@ -338,10 +342,10 @@ export default function TaskView() {
 
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success) {
-      setCommentJson(null); // Nollställ JSON
-      setCanPost(false); // Blockera knappen direkt
-      setResetKey((k) => k + 1); // Trigga remount
-      setUploadingFiles([]); // Rensa filer
+      setCommentJson(null);         // Nollställ JSON
+      setCanPost(false);            // Blockera knappen direkt
+      setResetKey((k) => k + 1);    // Trigga remount
+      setUploadingFiles([]);        // Rensa filer
     }
   }, [fetcher.state, fetcher.data]);
 
@@ -371,7 +375,7 @@ export default function TaskView() {
               // Fundera på om du vill nollställa toastShownForId här,
               // troligen inte nödvändigt eftersom deleteFetcher.data
               // kommer vara annorlunda vid nästa radering.
-              // setToastShownForId(null);
+                setToastShownForId(null);
             }}
           />
         ),
@@ -468,7 +472,7 @@ export default function TaskView() {
           )}
         </div>
       </div>
-      <div className="h-10"></div>
+          <div className="h-10"></div>
       <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#181818] border-t border-zinc-800 px-2 py-3 space-y-2">
         <fetcher.Form method="post">
           <RichTextJsonEditor
@@ -524,12 +528,16 @@ export default function TaskView() {
             ))}
             <button
               disabled={
-                !canPost || task.status !== "working" || hasUnfinishedUploads
+                !canPost ||
+                task.status !== "working" ||
+                hasUnfinishedUploads
               }
               className={`
                 w-9 h-9 rounded-full flex items-center justify-center text-white transition-transform
                 ${
-                  canPost && task.status === "working" && !hasUnfinishedUploads
+                  canPost &&
+                  task.status === "working" &&
+                  !hasUnfinishedUploads
                     ? "bg-green-700 hover:bg-green-600 hover:scale-105 cursor-pointer"
                     : "bg-zinc-700 opacity-50 cursor-not-allowed"
                 }
