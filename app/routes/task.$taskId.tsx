@@ -1,4 +1,10 @@
-import { useLoaderData, Link, useFetcher, useMatches, useRevalidator } from "@remix-run/react";
+import {
+  useLoaderData,
+  Link,
+  useFetcher,
+  useMatches,
+  useRevalidator,
+} from "@remix-run/react";
 import { prisma } from "../utils/db.server";
 import { json } from "@remix-run/node";
 import { useState, useEffect } from "react";
@@ -13,6 +19,7 @@ import { useNordEvent } from "../hooks/useNordEvent";
 import { CommentBubble, DeleteUndoToast } from "../components/comment-bubble";
 import { sourceMatchers } from "~/utils/sourceMatcher";
 import toast from "react-hot-toast";
+import { RichTextJsonEditor } from "~/components/editor/RichTextJsonEditor";
 
 export const loader = async (args) => {
   await requireUser(args, { requireActiveStatus: true });
@@ -48,7 +55,7 @@ export const loader = async (args) => {
       },
       comments: {
         where: {
-          deletedAt: null
+          deletedAt: null,
         },
         include: {
           user: { select: { id: true, name: true, imageUrl: true } },
@@ -74,9 +81,7 @@ export const loader = async (args) => {
   return json({ task, chain });
 };
 
-
-
-function extractLinkedFiles(content: string) {
+export function extractLinkedFiles(content: string) {
   const results: { url: string; source: string; name: string }[] = [];
 
   for (const matcher of sourceMatchers) {
@@ -119,24 +124,6 @@ export const action = async (args) => {
       userId: dbUser.id,
     },
   });
-
-
-  const linkedFiles = extractLinkedFiles(content);
-
-
-  await Promise.all(
-    linkedFiles.map((file) =>
-      prisma.file.create({
-        data: {
-          url: file.url,
-          name: file.name,
-          source: file.source as any, // typas som enum (S3, SHAREPOINT, etc)
-          userId: dbUser.id,
-          commentId: comment.id,
-        },
-      })
-    )
-  );
 
   if (uploadedFiles.length > 0) {
     await prisma.file.createMany({
@@ -331,66 +318,84 @@ export default function TaskView() {
     }
   });
 
-  const [comment, setComment] = useState("");
   const revalidator = useRevalidator(); // Hämta revalidator
   const { dbUser } = useRootData();
   const fetcher = useFetcher();
-  const commentDeleteFetcher = useFetcher<{ success: boolean; deletedCommentId?: string; error?: string }>();
+  const commentDeleteFetcher = useFetcher<{
+    success: boolean;
+    deletedCommentId?: string;
+    error?: string;
+  }>();
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const uploadedFiles = uploadingFiles
     .filter((f) => f.uploaded && f.result)
     .map((f) => f.result!) as UploadedFile[];
   const hasUnfinishedUploads = uploadingFiles.some((f) => !f.uploaded);
   const [toastShownForId, setToastShownForId] = useState<string | null>(null);
+  const [canPost, setCanPost] = useState(false);
+  const [commentJson, setCommentJson] = useState<string | null>(null);
+  const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success) {
-      setComment("");
-      setUploadingFiles([]);
+      setCommentJson(null); // Nollställ JSON
+      setCanPost(false); // Blockera knappen direkt
+      setResetKey((k) => k + 1); // Trigga remount
+      setUploadingFiles([]); // Rensa filer
     }
   }, [fetcher.state, fetcher.data]);
 
   useEffect(() => {
     const shouldShowToast =
-        commentDeleteFetcher.state === 'idle' &&
-        commentDeleteFetcher.data?.success &&
-        commentDeleteFetcher.data.deletedCommentId &&
-        // *** NYTT VILLKOR: Visa bara om vi INTE redan visat toast för detta ID ***
-        commentDeleteFetcher.data.deletedCommentId !== toastShownForId;
+      commentDeleteFetcher.state === "idle" &&
+      commentDeleteFetcher.data?.success &&
+      commentDeleteFetcher.data.deletedCommentId &&
+      // *** NYTT VILLKOR: Visa bara om vi INTE redan visat toast för detta ID ***
+      commentDeleteFetcher.data.deletedCommentId !== toastShownForId;
 
     if (shouldShowToast) {
       const deletedId = commentDeleteFetcher.data.deletedCommentId;
-      console.log('>>> Triggering UNDO Toast for ID:', deletedId);
+      console.log(">>> Triggering UNDO Toast for ID:", deletedId);
 
       // *** Markera att toasten för detta ID nu visas ***
       setToastShownForId(deletedId);
 
-      toast.custom((t) => (
+      toast.custom(
+        (t) => (
           <DeleteUndoToast
-              t={t}
-              commentId={deletedId}
-              onUndoSuccess={() => {
-                  // När ångra lyckas, kör revalidate
-                  revalidator.revalidate();
-                  // Fundera på om du vill nollställa toastShownForId här,
-                  // troligen inte nödvändigt eftersom deleteFetcher.data
-                  // kommer vara annorlunda vid nästa radering.
-                  // setToastShownForId(null);
-              }}
+            t={t}
+            commentId={deletedId}
+            onUndoSuccess={() => {
+              // När ångra lyckas, kör revalidate
+              revalidator.revalidate();
+              // Fundera på om du vill nollställa toastShownForId här,
+              // troligen inte nödvändigt eftersom deleteFetcher.data
+              // kommer vara annorlunda vid nästa radering.
+              // setToastShownForId(null);
+            }}
           />
-      ), { duration: 5000 });
-
+        ),
+        { duration: 5000 }
+      );
     }
     // Hantera ev. fel från delete-action
-    if (commentDeleteFetcher.state === 'idle' && commentDeleteFetcher.data?.error) {
-        // Undvik att visa felmeddelande upprepade gånger också? Kanske inte lika kritiskt.
-        toast.error(`Kunde inte ta bort kommentar: ${commentDeleteFetcher.data.error}`);
-        revalidator.revalidate();
+    if (
+      commentDeleteFetcher.state === "idle" &&
+      commentDeleteFetcher.data?.error
+    ) {
+      // Undvik att visa felmeddelande upprepade gånger också? Kanske inte lika kritiskt.
+      toast.error(
+        `Kunde inte ta bort kommentar: ${commentDeleteFetcher.data.error}`
+      );
+      revalidator.revalidate();
     }
     // *** Lägg till toastShownForId i dependency array ***
-  }, [commentDeleteFetcher.state, commentDeleteFetcher.data, revalidator, toastShownForId]);
-
-
+  }, [
+    commentDeleteFetcher.state,
+    commentDeleteFetcher.data,
+    revalidator,
+    toastShownForId,
+  ]);
 
   useEffect(() => {
     const handler = (event: FocusEvent) => {
@@ -456,7 +461,6 @@ export default function TaskView() {
                     dbUserId={dbUser?.id}
                     prevUserId={prev && prev.user.id}
                     deleteFetcher={commentDeleteFetcher}
-                    
                   />
                 );
               })}
@@ -464,19 +468,18 @@ export default function TaskView() {
           )}
         </div>
       </div>
-
+      <div className="h-10"></div>
       <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#181818] border-t border-zinc-800 px-2 py-3 space-y-2">
         <fetcher.Form method="post">
-          <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            rows={2}
-            disabled={task.status !== "working"}
-            name="content"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-600 resize-none"
-            placeholder="Skriv en kommentar..."
+          <RichTextJsonEditor
+            key={resetKey}
+            initialJson={commentJson}
+            onCanPostChange={setCanPost}
+            onBlur={(data) => {
+              const serialized = JSON.stringify(data.json);
+              setCommentJson(serialized);
+            }}
           />
-
           {/* Knapprad: vänster = upload + approve, höger = send */}
           <div className="flex items-center justify-between pt-1">
             {/* Vänstersida */}
@@ -508,6 +511,9 @@ export default function TaskView() {
             </div>
 
             <input type="hidden" name="taskId" value={task.id} />
+            {commentJson && (
+              <input type="hidden" name="content" value={commentJson} />
+            )}
             {uploadedFiles.map((file) => (
               <input
                 key={`${file.url}-${file.name}`}
@@ -518,16 +524,12 @@ export default function TaskView() {
             ))}
             <button
               disabled={
-                !comment.trim() ||
-                task.status !== "working" ||
-                hasUnfinishedUploads
+                !canPost || task.status !== "working" || hasUnfinishedUploads
               }
               className={`
                 w-9 h-9 rounded-full flex items-center justify-center text-white transition-transform
                 ${
-                  task.status === "working" &&
-                  comment.trim() &&
-                  !hasUnfinishedUploads
+                  canPost && task.status === "working" && !hasUnfinishedUploads
                     ? "bg-green-700 hover:bg-green-600 hover:scale-105 cursor-pointer"
                     : "bg-zinc-700 opacity-50 cursor-not-allowed"
                 }

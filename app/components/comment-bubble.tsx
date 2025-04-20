@@ -31,7 +31,6 @@ export const DeleteUndoToast = ({
   const undoFetcher = useFetcher();
 
   const handleUndo = () => {
-  
     undoFetcher.submit(null, {
       method: "post",
       action: `/api/comments/${commentId}/undo-delete`, // Din Ångra-action
@@ -96,134 +95,167 @@ export const DeleteUndoToast = ({
   );
 };
 
-function renderCommentWithLinks(text: string): React.ReactNode {
-  let remaining = text;
-  const result: React.ReactNode[] = [];
-  let key = 0;
-
-  while (remaining.length > 0) {
-    let earliestMatchIndex = -1;
-    let matchedUrl = "";
-    let matcherUsed: (typeof sourceMatchers)[0] | undefined;
-
-    // Hitta första matchande länk i texten
-    for (const matcher of sourceMatchers) {
-      const match = matcher.regex.exec(remaining);
-      if (
-        match &&
-        (earliestMatchIndex === -1 || match.index < earliestMatchIndex)
-      ) {
-        earliestMatchIndex = match.index;
-        matchedUrl = match[0];
-        matcherUsed = matcher;
-      }
-      matcher.regex.lastIndex = 0; // reset regexp state
-    }
-
-    if (earliestMatchIndex === -1 || !matcherUsed) {
-      result.push(<span key={key++}>{remaining}</span>);
-      break;
-    }
-
-    // Lägg till text före länken
-    if (earliestMatchIndex > 0) {
-      result.push(
-        <span key={key++}>{remaining.slice(0, earliestMatchIndex)}</span>
-      );
-    }
-
-    // Lägg till själva länken
-    result.push(
-      <a
-        key={key++}
-        href={matchedUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="pl-2 pr-2 border border-zinc-900 bg-zinc-900 rounded-md text-xs text-white hover:bg-emerald-700"
-      >
-        {matcherUsed.extractName(matchedUrl)}
-      </a>
-    );
-
-    // Klipp bort det vi precis processade
-    remaining = remaining.slice(earliestMatchIndex + matchedUrl.length);
+function renderLexicalJsonToReact(json: any): React.ReactNode {
+  const root = json.root ?? json;
+  if (!root || root.type !== "root" || !Array.isArray(root.children)) {
+    return null;
   }
 
-  return result;
-}
+  const output: React.ReactNode[] = [];
+  let key = 0;
 
+  for (const node of root.children) {
+    if (node.type === "paragraph" && Array.isArray(node.children)) {
+      const parts: React.ReactNode[] = [];
+
+      for (const child of node.children) {
+        if (child.type === "text") {
+          let className = "";
+          if (child.format) {
+            if (child.format & 1) className += " font-bold";
+            if (child.format & 2) className += " italic";
+            if (child.format & 4) className += " underline";
+            if (child.format & 8) className += " line-through";
+            if (child.format & 16)
+              className += " font-mono bg-zinc-800 px-1 rounded";
+          }
+
+          parts.push(
+            <span key={key++} className={className.trim()}>
+              {child.text}
+            </span>
+          );
+        }
+
+        if (child.type === "inline-badge") {
+          const { text, url } = child;
+          const badgeClass =
+            "inline-flex items-center gap-1 bg-zinc-800 text-zinc-300 text-xs pr-2 pl-1 py-1 rounded-full hover:bg-zinc-700 transition-colors";
+
+          if (url) {
+            parts.push(
+              <a
+                key={key++}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={badgeClass}
+              >
+                <svg
+                  className="w-3 h-3 mt-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 12.79V7a5 5 0 00-10 0v9a3 3 0 006 0V9"
+                  />
+                </svg>{" "}
+                {text}
+              </a>
+            );
+          } else {
+            parts.push(
+              <span key={key++} className={badgeClass}>
+                {text}
+              </span>
+            );
+          }
+
+          parts.push(<span key={key++}> </span>);
+        }
+      }
+
+      output.push(
+        <div
+          key={key++}
+          className="mb-2 leading-snug whitespace-pre-wrap break-words"
+        >
+          {parts}
+        </div>
+      );
+    }
+  }
+
+  return output;
+}
 
 export function CommentBubble({
   comment,
   prevUserId,
   dbUserId,
-  deleteFetcher
+  deleteFetcher,
 }: {
   comment: any;
   prevUserId?: string;
   dbUserId?: string;
-  deleteFetcher: FetcherWithComponents<{ success: boolean; deletedCommentId?: string; error?: string }>; 
+  deleteFetcher: FetcherWithComponents<{
+    success: boolean;
+    deletedCommentId?: string;
+    error?: string;
+  }>;
 }) {
-  const isSameUser = prevUserId === comment.user.id;
   const isMine = comment.user.id === dbUserId;
-
+  const isSameUser = prevUserId === comment.user.id;
   const [isVisible, setIsVisible] = useState(true);
   const { activeId, bind } = useLongHoverPress(500);
   const bindProps = bind(comment.id);
-  const showDelete = activeId === comment.id;
-
+  const showMenu = activeId === comment.id;
 
   const handleDeleteClick = () => {
-    // 1. Optimistisk UI-uppdatering: Dölj direkt
     setIsVisible(false);
-
-    // 2. Skicka formuläret för mjuk radering
     deleteFetcher.submit(null, {
-      // Skicka med submit istället för Form's default
       method: "post",
       action: `/api/comments/${comment.id}/soft-delete`,
     });
   };
 
-  // Om inte synlig (pga optimistisk radering), rendera ingenting
-  if (!isVisible) {
-    return null;
-  }
+  if (!isVisible) return null;
 
   return (
     <div
-      className="relative group flex gap-3 items-start"
+      className={`relative group flex items-end gap-2  ${
+        isMine ? "justify-end" : "justify-start"
+      }`}
       {...(isMine ? bindProps : {})}
     >
-      {!isSameUser ? (
+      {!isMine && !isSameUser ? (
         <Avatar user={comment.user} size={8} />
       ) : (
-        <div className="w-8 flex justify-center" />
+        <div className="w-8 flex-shrink-0" />
       )}
 
-      <div
-        className={`bg-zinc-900 text-white text-sm px-2 py-2 rounded-md whitespace-pre-wrap max-w-xl ${
-          isSameUser ? "mt-0.5" : ""
-        }`}
-      >
-        <div className="text-xs text-zinc-400 mb-0.5">
-          {!isSameUser && `${comment.user.name} • `}
-          {timeAgo(new Date(comment.createdAt))}
-        </div>
+      <div className="w-fit max-w-[85vw] relative">
+        <div
+          className={`rounded-xl px-4 py-2 text-sm leading-snug ${
+            isMine
+              ? "bg-emerald-950 text-white"
+              : "bg-zinc-900 text-white text-sm"
+          }`}
+        >
+          <div className="text-xs text-zinc-400 mb-1">
+            {!isMine && !isSameUser && `${comment.user.name} • `}
+            {timeAgo(new Date(comment.createdAt))}
+          </div>
 
-        {renderCommentWithLinks(comment.content)}
+          {renderLexicalJsonToReact(JSON.parse(comment.content))}
 
-        {comment.files.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {comment.files.map((file: any) => (
-              <a
-                key={file.id}
-                href={file.source === "S3" ? `/api/files/${file.id}` : file.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 bg-zinc-800 text-zinc-300 text-xs pr-2 pl-1 py-1 rounded-full hover:bg-zinc-700 transition-colors"
-              >
-                <svg
+          {comment.files.length > 0 && (
+            <div className="flex-1 overflow-y-auto px-4 pb-20 flex-1 overflow-y-auto px-4 pt-4">
+              {comment.files.map((file: any) => (
+                <a
+                  key={file.id}
+                  href={
+                    file.source === "S3" ? `/api/files/${file.id}` : file.url
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 bg-zinc-700 text-zinc-300 text-xs pr-2 pl-1 py-1 rounded-full hover:bg-zinc-600 transition-colors"
+                >
+                  <svg
                     className="w-3 h-3 mt-0.5"
                     fill="none"
                     stroke="currentColor"
@@ -235,31 +267,97 @@ export function CommentBubble({
                       strokeLinejoin="round"
                       d="M21 12.79V7a5 5 0 00-10 0v9a3 3 0 006 0V9"
                     />
-                  </svg>{file.name}
-              </a>
-            ))}
-          </div>
+                  </svg>
+                  {file.name}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {isMine && showMenu && (
+          <>
+            <div className="hidden sm:flex absolute -top-3 -right-0 flex items-center gap-1 bg-white rounded-lg shadow-lg pl-1 pr-1 z-50">
+              <button
+                onClick={() => console.log("Redigera")}
+                className="text-zinc-300 hover:text-white p-1"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="w-5 h-5 text-zinc-500 hover:text-zinc-800"
+                >
+                  <path d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zM21.41 6.34a1.25 1.25 0 0 0 0-1.77l-2.34-2.34a1.25 1.25 0 0 0-1.77 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Ta bort preventDefault om du inte behöver det för annat
+                  handleDeleteClick(); // Anropa den nya funktionen
+                }}
+                className="text-zinc-500 hover:text-zinc-800 p-1"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="w-5 h-5"
+                >
+                  <path d="M22 5a1 1 0 0 1-1 1H3a1 1 0 0 1 0-2h5V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1h5a1 1 0 0 1 1 1ZM4.934 21.071 4 8h16l-.934 13.071a1 1 0 0 1-1 .929H5.931a1 1 0 0 1-.997-.929ZM15 18a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Z" />
+                </svg>
+              </button>
+            </div>
+           {/* Mobil meny – visas endast på små skärmar */}
+<div className="sm:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm">
+  {/* Klick utanför stänger */}
+  <div
+    className="absolute inset-0"
+    onClick={() => setIsVisible(true)}
+  />
+
+  <div
+    className="w-full bg-zinc-900 rounded-t-2xl p-4 z-10 space-y-4 pb-10"
+    style={{
+      transform: "translateY(0%)",
+      opacity: 1,
+      transition: "transform 0.3s ease-out, opacity 0.3s ease-out",
+    }}
+  >
+    <button
+      onClick={() => console.log("Redigera")}
+      className="flex items-center space-x-3 text-white hover:text-green-400 transition"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="w-5 h-5 text-zinc-400"
+      >
+        <path d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zM21.41 6.34a1.25 1.25 0 0 0 0-1.77l-2.34-2.34a1.25 1.25 0 0 0-1.77 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+      </svg>
+      <span className="text-sm font-medium">Redigera</span>
+    </button>
+
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        handleDeleteClick();
+      }}
+      className="flex items-center space-x-3 text-white hover:text-red-400 transition"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="w-5 h-5 text-zinc-400"
+      >
+        <path d="M22 5a1 1 0 0 1-1 1H3a1 1 0 0 1 0-2h5V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1h5a1 1 0 0 1 1 1ZM4.934 21.071 4 8h16l-.934 13.071a1 1 0 0 1-1 .929H5.931a1 1 0 0 1-.997-.929ZM15 18a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Z" />
+      </svg>
+      <span className="text-sm font-medium">Ta bort</span>
+    </button>
+  </div>
+</div>
+          </>
         )}
       </div>
-
-      {/* Papperskorgen */}
-      {isMine && showDelete && (
-        <div className="absolute -left-0.5 top-0 z-50">
-          <button
-            type="submit"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Ta bort preventDefault om du inte behöver det för annat
-              handleDeleteClick(); // Anropa den nya funktionen
-            }}
-            className="block text-left px-2 py-2 text-sm text-zinc-400 hover:text-zinc-500 bg-zinc-800 rounded-full shadow-lg"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-              <path d="M22 5a1 1 0 0 1-1 1H3a1 1 0 0 1 0-2h5V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1h5a1 1 0 0 1 1 1ZM4.934 21.071 4 8h16l-.934 13.071a1 1 0 0 1-1 .929H5.931a1 1 0 0 1-.997-.929ZM15 18a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Z" />
-            </svg>
-          </button>
-        </div>
-      )}
     </div>
   );
 }
