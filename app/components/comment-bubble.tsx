@@ -201,9 +201,10 @@ export function CommentBubble({
   const isMine = comment.user.id === dbUserId;
   const isSameUser = prevUserId === comment.user.id;
   const [isVisible, setIsVisible] = useState(true);
-  const { activeId, bind } = useLongHoverPress(500);
+  const { activeId, bind, clear } = useLongHoverPress(500);
   const bindProps = bind(comment.id);
   const showMenu = activeId === comment.id;
+  
 
   const handleDeleteClick = () => {
     setIsVisible(false);
@@ -307,54 +308,54 @@ export function CommentBubble({
                 </svg>
               </button>
             </div>
-           {/* Mobil meny – visas endast på små skärmar */}
-<div className="sm:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm">
-  {/* Klick utanför stänger */}
-  <div
-    className="absolute inset-0"
-    onClick={() => setIsVisible(true)}
-  />
+            {/* Mobil meny – visas endast på små skärmar */}
+            <div className="sm:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm">
+              {/* Klick utanför stänger */}
+              <div
+                className="absolute inset-0"
+                onClick={() => clear()}
+              />
 
-  <div
-    className="w-full bg-zinc-900 rounded-t-2xl p-4 z-10 space-y-4 pb-10"
-    style={{
-      transform: "translateY(0%)",
-      opacity: 1,
-      transition: "transform 0.3s ease-out, opacity 0.3s ease-out",
-    }}
-  >
-    <button
-      onClick={() => console.log("Redigera")}
-      className="flex items-center space-x-3 text-white hover:text-green-400 transition"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="w-5 h-5 text-zinc-400"
-      >
-        <path d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zM21.41 6.34a1.25 1.25 0 0 0 0-1.77l-2.34-2.34a1.25 1.25 0 0 0-1.77 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-      </svg>
-      <span className="text-sm font-medium">Redigera</span>
-    </button>
+              <div
+                className="w-full bg-zinc-900 rounded-t-2xl p-4 z-10 space-y-4"
+                style={{
+                  transform: "translateY(0%)",
+                  opacity: 1,
+                  transition: "transform 0.3s ease-out, opacity 0.3s ease-out",
+                }}
+              >
+                <button
+                  onClick={() => console.log("Redigera")}
+                  className="flex items-center space-x-3 text-white hover:text-green-400 transition"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-5 h-5 text-zinc-400"
+                  >
+                    <path d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zM21.41 6.34a1.25 1.25 0 0 0 0-1.77l-2.34-2.34a1.25 1.25 0 0 0-1.77 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                  </svg>
+                  <span className="text-sm font-medium">Redigera</span>
+                </button>
 
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        handleDeleteClick();
-      }}
-      className="flex items-center space-x-3 text-white hover:text-red-400 transition"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="w-5 h-5 text-zinc-400"
-      >
-        <path d="M22 5a1 1 0 0 1-1 1H3a1 1 0 0 1 0-2h5V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1h5a1 1 0 0 1 1 1ZM4.934 21.071 4 8h16l-.934 13.071a1 1 0 0 1-1 .929H5.931a1 1 0 0 1-.997-.929ZM15 18a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Z" />
-      </svg>
-      <span className="text-sm font-medium">Ta bort</span>
-    </button>
-  </div>
-</div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick();
+                  }}
+                  className="flex items-center space-x-3 text-white hover:text-red-400 transition"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-5 h-5 text-zinc-400"
+                  >
+                    <path d="M22 5a1 1 0 0 1-1 1H3a1 1 0 0 1 0-2h5V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1h5a1 1 0 0 1 1 1ZM4.934 21.071 4 8h16l-.934 13.071a1 1 0 0 1-1 .929H5.931a1 1 0 0 1-.997-.929ZM15 18a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Zm-4 0a1 1 0 0 0 2 0v-6a1 1 0 0 0-2 0Z" />
+                  </svg>
+                  <span className="text-sm font-medium">Ta bort</span>
+                </button>
+              </div>
+            </div>
           </>
         )}
       </div>

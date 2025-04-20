@@ -141,5 +141,5 @@ export function useLongHoverPress(ms = 1200) {
   }, [clear]); // Dependency: clear
 
   // Returnera state och bind-funktion
-  return { activeId, bind };
+  return { activeId, bind, clear: () => setActiveId(null) };
 }
