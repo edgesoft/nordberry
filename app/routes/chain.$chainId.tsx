@@ -57,7 +57,11 @@ export const loader = async (args: LoaderFunctionArgs) => {
           },
           _count: {
             select: {
-              comments: true,
+              comments: {
+                where: {
+                  deletedAt: null,
+                },
+              },
             },
           },
         },
