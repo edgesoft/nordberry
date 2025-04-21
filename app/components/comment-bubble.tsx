@@ -144,6 +144,7 @@ function FileBadge({
 
   return <span className={badgeClass}>{content}</span>;
 }
+
 function renderLexicalJsonToReact(json: any, isMine = false): React.ReactNode {
   const root = json.root ?? json;
   if (!root || root.type !== "root" || !Array.isArray(root.children)) {
@@ -154,7 +155,13 @@ function renderLexicalJsonToReact(json: any, isMine = false): React.ReactNode {
   let key = 0;
 
   for (const node of root.children) {
-    // 📌 Hantera paragrafer
+    // ✳️ Tom paragraf = radbrytning
+    if (node.type === "paragraph" && (!node.children || node.children.length === 0)) {
+      output.push(<div key={key++} className="h-2" />);
+      continue;
+    }
+
+    // 📌 Paragraf med innehåll
     if (node.type === "paragraph" && Array.isArray(node.children)) {
       output.push(
         <div
@@ -164,6 +171,7 @@ function renderLexicalJsonToReact(json: any, isMine = false): React.ReactNode {
           {renderChildren(node.children, isMine, key++)}
         </div>
       );
+      continue;
     }
 
     // 📌 Hantera listor
@@ -178,10 +186,10 @@ function renderLexicalJsonToReact(json: any, isMine = false): React.ReactNode {
             isOrdered ? "list-decimal" : "list-disc"
           } [&_li]:ml-2 [&_li]:leading-snug`}
         >
-          {node.children.map((li: any, idx: number) => {
+          {node.children.map((li: any) => {
             if (li.type === "listitem") {
               return (
-                <li key={key++} className="mb-1">
+                <li key={key++}>
                   {renderChildren(li.children ?? [], isMine, key++)}
                 </li>
               );
