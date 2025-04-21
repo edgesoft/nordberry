@@ -7,7 +7,7 @@ import {
 } from "@remix-run/react";
 import { prisma } from "../utils/db.server";
 import { json } from "@remix-run/node";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Avatar from "../components/avatar";
 import { getAuth } from "@clerk/remix/ssr.server";
 import TaskStep from "../components/task-step";
@@ -307,9 +307,19 @@ function TaskApprovers({ task, assignees }) {
     </div>
   );
 }
-
 export default function TaskView() {
   const { task, chain } = useLoaderData<typeof loader>();
+  const revalidator = useRevalidator();
+  const { dbUser } = useRootData();
+  const fetcher = useFetcher();
+  const commentDeleteFetcher = useFetcher();
+  const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
+  const [toastShownForId, setToastShownForId] = useState<string | null>(null);
+  const [canPost, setCanPost] = useState(false);
+  const [commentJson, setCommentJson] = useState<string | null>(null);
+  const [resetKey, setResetKey] = useState(0);
+  const [toastHistory, setToastHistory] = useState<Record<string, number>>({});
+
   useNordEvent((payload) => {
     if (
       (payload.table === "task" && payload.data?.id === task.id) ||
@@ -321,108 +331,123 @@ export default function TaskView() {
     }
   });
 
-  const revalidator = useRevalidator(); // Hämta revalidator
-  const { dbUser } = useRootData();
-  const fetcher = useFetcher();
-  const commentDeleteFetcher = useFetcher<{
-    success: boolean;
-    deletedCommentId?: string;
-    error?: string;
-  }>();
-  const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
-  const uploadedFiles = uploadingFiles
-    .filter((f) => f.uploaded && f.result)
-    .map((f) => f.result!) as UploadedFile[];
-  const hasUnfinishedUploads = uploadingFiles.some((f) => !f.uploaded);
-  const [toastShownForId, setToastShownForId] = useState<string | null>(null);
-  const [canPost, setCanPost] = useState(false);
-  const [commentJson, setCommentJson] = useState<string | null>(null);
-  const [resetKey, setResetKey] = useState(0);
+  const uploadedFiles = useMemo(
+    () =>
+      uploadingFiles
+        .filter((f) => f.uploaded && f.result)
+        .map((f) => f.result!),
+    [uploadingFiles]
+  );
+
+  const hasUnfinishedUploads = useMemo(
+    () => uploadingFiles.some((f) => !f.uploaded),
+    [uploadingFiles]
+  );
 
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success) {
-      setCommentJson(null); // Nollställ JSON
-      setCanPost(false); // Blockera knappen direkt
-      setResetKey((k) => k + 1); // Trigga remount
-      setUploadingFiles([]); // Rensa filer
+      setCommentJson(null);
+      setCanPost(false);
+      setResetKey((k) => k + 1);
+      setUploadingFiles([]);
     }
   }, [fetcher.state, fetcher.data]);
 
   useEffect(() => {
+    const deletedId = commentDeleteFetcher.data?.deletedCommentId;
+    const now = Date.now();
+  
+    const lastShown = deletedId ? toastHistory[deletedId] : null;
+    const recentlyShown = lastShown && now - lastShown < 2000;
+  
     const shouldShowToast =
       commentDeleteFetcher.state === "idle" &&
       commentDeleteFetcher.data?.success &&
-      commentDeleteFetcher.data.deletedCommentId &&
-      // *** NYTT VILLKOR: Visa bara om vi INTE redan visat toast för detta ID ***
-      commentDeleteFetcher.data.deletedCommentId !== toastShownForId;
-
+      deletedId &&
+      !recentlyShown;
+  
     if (shouldShowToast) {
-      const deletedId = commentDeleteFetcher.data.deletedCommentId;
-      console.log(">>> Triggering UNDO Toast for ID:", deletedId);
-
-      // *** Markera att toasten för detta ID nu visas ***
-      setToastShownForId(deletedId);
-
+      setToastHistory((prev) => ({ ...prev, [deletedId]: now }));
+  
       toast.custom(
         (t) => (
           <DeleteUndoToast
             t={t}
             commentId={deletedId}
             onUndoSuccess={() => {
-              // När ångra lyckas, kör revalidate
               revalidator.revalidate();
-              // Fundera på om du vill nollställa toastShownForId här,
-              // troligen inte nödvändigt eftersom deleteFetcher.data
-              // kommer vara annorlunda vid nästa radering.
-              setToastShownForId(null);
             }}
           />
         ),
         { duration: 5000 }
       );
     }
-    // Hantera ev. fel från delete-action
+  
     if (
       commentDeleteFetcher.state === "idle" &&
       commentDeleteFetcher.data?.error
     ) {
-      // Undvik att visa felmeddelande upprepade gånger också? Kanske inte lika kritiskt.
-      toast.error(
-        `Kunde inte ta bort kommentar: ${commentDeleteFetcher.data.error}`
-      );
+      toast.error(`Kunde inte ta bort kommentar: ${commentDeleteFetcher.data.error}`);
       revalidator.revalidate();
     }
-    // *** Lägg till toastShownForId i dependency array ***
   }, [
     commentDeleteFetcher.state,
     commentDeleteFetcher.data,
+    toastHistory,
     revalidator,
-    toastShownForId,
   ]);
 
   useEffect(() => {
     const handler = (event: FocusEvent) => {
       const el = event.target as HTMLElement;
-
       if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
-        // Ge tid för tangentbord att öppnas
         setTimeout(() => {
-          el.scrollIntoView({
-            behavior: "smooth",
-            block: "center", // centrera fältet mitt i vyn
-          });
-        }, 300); // funkar bäst med 300-500ms delay
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 300);
       }
     };
-
     window.addEventListener("focusin", handler);
-    return () => {
-      window.removeEventListener("focusin", handler);
-    };
+    return () => window.removeEventListener("focusin", handler);
   }, []);
 
-  const isEnabled =
-    canPost && task.status === "working" && !hasUnfinishedUploads;
+  const isEnabled = useMemo(
+    () => canPost && task.status === "working" && !hasUnfinishedUploads,
+    [canPost, task.status, hasUnfinishedUploads]
+  );
+
+  const renderSteps = useMemo(() => (
+    <div className="flex flex-wrap gap-2">
+      {chain.tasks.map((t) => (
+        <TaskStep
+          loggedInDbUserId={dbUser.id}
+          key={t.id}
+          step={t}
+          useLink={true}
+        />
+      ))}
+    </div>
+  ), [chain.tasks, dbUser.id]);
+
+  const renderComments = useMemo(() => {
+    if (task.comments.length === 0) return null;
+    return (
+      <div className="space-y-3">
+        {task.comments.map((comment, idx) => {
+          const prev = task.comments[idx - 1];
+          return (
+            <CommentBubble
+              key={comment.id}
+              comment={comment}
+              dbUserId={dbUser?.id}
+              prevUserId={prev?.user.id}
+              deleteFetcher={commentDeleteFetcher}
+            />
+          );
+        })}
+      </div>
+    );
+  }, [task.comments, dbUser?.id, commentDeleteFetcher]);
+
   return (
     <>
       <div className="pt-20 pb-36 px-4 bg-black text-white min-h-screen space-y-4">
@@ -439,121 +464,91 @@ export default function TaskView() {
             {chain.name} / {task.title}
           </h1>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {chain.tasks.map((t) => {
-            return (
-              <TaskStep
-                loggedInDbUserId={dbUser.id}
-                key={t.id}
-                step={t}
-                useLink={true}
-              />
-            );
-          })}
-        </div>
 
-        <div className="space-y-3">
-          <TaskApprovers task={task} assignees={task.assignments} />
-          {task.comments.length > 0 && (
-            <>
-              <div className="text-sm text-gray-400 uppercase mb-2"></div>
-              {task.comments.map((comment, idx) => {
-                const prev = task.comments[idx - 1];
-                return (
-                  <CommentBubble
-                    key={comment.id}
-                    comment={comment}
-                    dbUserId={dbUser?.id}
-                    prevUserId={prev && prev.user.id}
-                    deleteFetcher={commentDeleteFetcher}
-                  />
-                );
-              })}
-            </>
-          )}
-        </div>
+        {renderSteps}
+        <TaskApprovers task={task} assignees={task.assignments} />
+        {renderComments}
       </div>
+
       {task.status === "working" && (
         <>
-      <div className="h-10"></div>
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#181818] border-t border-zinc-800 px-2 py-3 space-y-2">
-        <fetcher.Form method="post">
-          <RichTextJsonEditor
-            key={resetKey}
-            initialJson={commentJson}
-            onCanPostChange={setCanPost}
-            onBlur={(data) => {
-              const serialized = JSON.stringify(data.json);
-              setCommentJson(serialized);
-            }}
-          />
-          {/* Knapprad: vänster = upload + approve, höger = send */}
-          <div className="flex items-center justify-between pt-1">
-            {/* Vänstersida */}
-            <div className="flex gap-2">
-              <FileUploader
-                onUploadComplete={(uploaded) => {
-                  setUploadingFiles((prev) =>
-                    prev.map((f) =>
-                      !f.uploaded &&
-                      uploaded.some(
-                        (u) => u.name === f.file.name && u.url === f.url
-                      )
-                        ? {
-                            ...f,
-                            uploaded: true,
-                            progress: 100,
-                            result: uploaded.find(
-                              (u) => u.name === f.file.name && u.url === f.url
-                            ),
-                          }
-                        : f
-                    )
-                  );
+          <div className="h-10" />
+          <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#181818] border-t border-zinc-800 px-2 py-3 space-y-2">
+            <fetcher.Form method="post">
+              <RichTextJsonEditor
+                key={resetKey}
+                initialJson={commentJson}
+                onCanPostChange={setCanPost}
+                onBlur={(data) => {
+                  const serialized = JSON.stringify(data.json);
+                  setCommentJson(serialized);
                 }}
-                setUploadingFiles={setUploadingFiles}
-                uploadingFiles={uploadingFiles}
-                task={task}
               />
-            </div>
 
-            <input type="hidden" name="taskId" value={task.id} />
-            {commentJson && (
-              <input type="hidden" name="content" value={commentJson} />
-            )}
-            {uploadedFiles.map((file) => (
-              <input
-                key={`${file.url}-${file.name}`}
-                type="hidden"
-                name="uploadedFiles"
-                value={JSON.stringify(file)}
-              />
-            ))}
-            <button
-              disabled={!isEnabled}
-              className={`
-                w-9 h-9 rounded-full flex items-center justify-center text-white transition-transform
-                ${
-                  isEnabled
-                    ? "bg-green-700 hover:bg-green-600 hover:scale-105 cursor-pointer"
-                    : "bg-zinc-700 opacity-50 cursor-not-allowed"
-                }
-              `}
-              title="Skicka"
-            >
-              <svg
-                className="w-4 h-4 relative left-[1px]"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
-            </button>
+              <div className="flex items-center justify-between pt-1">
+                <FileUploader
+                  onUploadComplete={(uploaded) => {
+                    setUploadingFiles((prev) =>
+                      prev.map((f) =>
+                        !f.uploaded &&
+                        uploaded.some(
+                          (u) => u.name === f.file.name && u.url === f.url
+                        )
+                          ? {
+                              ...f,
+                              uploaded: true,
+                              progress: 100,
+                              result: uploaded.find(
+                                (u) =>
+                                  u.name === f.file.name && u.url === f.url
+                              ),
+                            }
+                          : f
+                      )
+                    );
+                  }}
+                  setUploadingFiles={setUploadingFiles}
+                  uploadingFiles={uploadingFiles}
+                  task={task}
+                />
+                <input type="hidden" name="taskId" value={task.id} />
+                {commentJson && (
+                  <input type="hidden" name="content" value={commentJson} />
+                )}
+                {uploadedFiles.map((file) => (
+                  <input
+                    key={`${file.url}-${file.name}`}
+                    type="hidden"
+                    name="uploadedFiles"
+                    value={JSON.stringify(file)}
+                  />
+                ))}
+                <button
+                  disabled={!isEnabled}
+                  className={`
+                    w-9 h-9 rounded-full flex items-center justify-center text-white transition-transform
+                    ${
+                      isEnabled
+                        ? "bg-green-700 hover:bg-green-600 hover:scale-105 cursor-pointer"
+                        : "bg-zinc-700 opacity-50 cursor-not-allowed"
+                    }
+                  `}
+                  title="Skicka"
+                >
+                  <svg
+                    className="w-4 h-4 relative left-[1px]"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                  </svg>
+                </button>
+              </div>
+            </fetcher.Form>
           </div>
-        </fetcher.Form>
-      </div>
-      </>
+        </>
       )}
     </>
   );
 }
+

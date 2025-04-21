@@ -104,7 +104,7 @@ function FileBadge({
   isMine?: boolean;
 }) {
   const badgeClass = [
-    "inline-flex items-center gap-1 text-xs pr-2 pl-1 py-1 rounded-full transition-colors mb-1",
+    "inline-flex items-center gap-1 text-xs pr-2 pl-1 py-1 rounded-full transition-colors mb-1 mr-1",
     isMine
       ? "bg-emerald-800 text-zinc-100 hover:bg-zinc-600"
       : "bg-zinc-950 text-zinc-200 hover:bg-zinc-700",
@@ -374,7 +374,7 @@ export function CommentBubble({
           />
 
           {comment.files.length > 0 && (
-            <div className="flex-1 overflow-y-auto px-4 pl-0 flex-1 overflow-y-auto  pt-4">
+            <div className="flex-1 overflow-y-auto px-4 pl-0 flex-1 overflow-y-auto pt-4 ">
               {comment.files.map((file: any) => (
                 <FileBadge
                   key={file.id}
