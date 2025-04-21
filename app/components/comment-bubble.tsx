@@ -432,7 +432,7 @@ export function CommentBubble({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onEditRequest?.(); // 👈 nytt
+                  onEditRequest?.();
                 }}
                 className="text-zinc-300 hover:text-white p-1"
               >
@@ -475,7 +475,10 @@ export function CommentBubble({
                 }}
               >
                 <button
-                  onClick={() => console.log("Redigera")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditRequest?.();
+                  }}
                   className="flex items-center space-x-3 text-white hover:text-green-400 transition"
                 >
                   <svg
