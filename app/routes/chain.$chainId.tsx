@@ -55,6 +55,16 @@ export const loader = async (args: LoaderFunctionArgs) => {
               },
             },
           },
+          dependedOnBy: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              chainId: true,
+              chain: { select: { name: true } },
+              assignments: { select: { userId: true } },
+            },
+          },
           _count: {
             select: {
               comments: {
@@ -206,41 +216,80 @@ const StepCard = ({ task }: StepCardProps) => {
                 </span>
               )}
             </div>
-            {/* Dependencies */}
-            {task.dependencies && task.dependencies.length > 0 && (
-              <div className="flex flex-wrap gap-2 items-center text-xs text-gray-500 pt-1">
-                {task.dependencies.map((dep) => {
-                  const isUserAssigned = dep.assignments?.some(
-                    (assignment) => assignment.userId === loggedInDbUserId
-                  );
+            {/* Dependencies (← Beroende av) */}
+            {task.dependencies?.length > 0 && (
+              <div className="flex flex-col gap-1 pt-1">
+                <span className="text-xs text-gray-500">← Beroende av:</span>
+                <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs">
+                  {task.dependencies.map((dep) => {
+                    const isUserAssigned = dep.assignments?.some(
+                      (a) => a.userId === loggedInDbUserId
+                    );
 
-                  const appearanceClasses = isUserAssigned
-                    ? "text-gray-300 bg-zinc-800" // Interaktivt utseende
-                    : "text-gray-500 bg-zinc-900 opacity-70"; // Icke-interaktivt utseende
+                    const appearanceClasses = isUserAssigned
+                      ? "text-gray-300 bg-zinc-800"
+                      : "text-gray-500 bg-zinc-900 opacity-70";
 
-                  const depRingColor =
-                    ringColors[dep.status as keyof typeof ringColors] ??
-                    "bg-gray-600";
-                  const prefix =
-                    dep.chainId !== task.chainId && dep.chain?.name
-                      ? `${dep.chain.name} `
-                      : "";
-                  return (
-                    <div
-                      key={dep.id}
-                      className={`flex items-center gap-1 px-2 py-0.5 bg-zinc-800 border border-zinc-700 rounded-md ${appearanceClasses}`}
-                      title={`Status: ${dep.status}`}
-                    >
-                      <span
-                        className={`w-2 h-2 rounded-full ${depRingColor} border border-gray-700`}
-                      />
-                      <span className="text-gray-400 font-semibold">
-                        {prefix}
-                      </span>
-                      <span className="text-gray-500">{dep.title}</span>
-                    </div>
-                  );
-                })}
+                    const depRingColor =
+                      ringColors[dep.status as keyof typeof ringColors] ??
+                      "bg-gray-600";
+
+                    const prefix =
+                      dep.chainId !== task.chainId && dep.chain?.name
+                        ? `${dep.chain.name} `
+                        : "";
+
+                    return (
+                      <div
+                        key={dep.id}
+                        className={`flex items-center gap-1 px-2 py-0.5 border border-zinc-700 rounded-md ${appearanceClasses}`}
+                        title={`Detta steg är beroende av: ${dep.title}`}
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full ${depRingColor} border border-gray-700`}
+                        />
+                        <span className="text-gray-400 font-semibold">
+                          {prefix}
+                        </span>
+                        <span className="text-gray-500">{dep.title}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {/* DependedOnBy (→ Påverkar) */}
+            {task.dependedOnBy?.length > 0 && (
+              <div className="flex flex-col gap-1 pt-1">
+                <span className="text-xs text-gray-500">→ Påverkar:</span>
+                <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs">
+                  {task.dependedOnBy.map((dep) => {
+                    const depRingColor =
+                      ringColors[dep.status as keyof typeof ringColors] ??
+                      "bg-gray-600";
+
+                    const prefix =
+                      dep.chainId !== task.chainId && dep.chain?.name
+                        ? `${dep.chain.name} `
+                        : "";
+
+                    return (
+                      <div
+                        key={dep.id}
+                        className="flex items-center gap-1 px-2 py-0.5 bg-zinc-900 border border-zinc-700 rounded-md"
+                        title={`Detta steg påverkar: ${dep.title}`}
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full ${depRingColor} border border-gray-700`}
+                        />
+                        <span className="text-gray-400 font-semibold">
+                          {prefix}
+                        </span>
+                        <span className="text-gray-500">{dep.title}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
