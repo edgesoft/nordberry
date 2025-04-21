@@ -287,7 +287,7 @@ export function CommentBubble({
           <CommentContent content={JSON.parse(comment.content)} />
 
           {comment.files.length > 0 && (
-            <div className="flex-1 overflow-y-auto px-4 flex-1 overflow-y-auto px-4 pt-4">
+            <div className="flex-1 overflow-y-auto px-4 pl-0 flex-1 overflow-y-auto  pt-4">
               {comment.files.map((file: any) => (
                 <a
                   key={file.id}
@@ -296,7 +296,7 @@ export function CommentBubble({
                   }
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 bg-zinc-700 text-zinc-300 text-xs pr-2 pl-1 py-1 rounded-full hover:bg-zinc-600 transition-colors"
+                  className="inline-flex items-center gap-1 bg-zinc-800 text-zinc-300  text-xs pr-2 pl-1 py-1 rounded-full hover:bg-zinc-600 transition-colors"
                 >
                   <svg
                     className="w-3 h-3 mt-0.5"
