@@ -3,8 +3,8 @@ import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
-import { AutoFocusPlugin } from "@lexical/react/LexicalAutoFocusPlugin";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 
 import {
   $createParagraphNode,
@@ -18,10 +18,17 @@ import {
   PASTE_COMMAND,
   COMMAND_PRIORITY_HIGH,
   DecoratorNode,
-  SerializedLexicalNode,
   LexicalEditor,
 } from "lexical";
 import { mergeRegister } from "@lexical/utils";
+import {
+  ListNode,
+  ListItemNode,
+  INSERT_UNORDERED_LIST_COMMAND,
+  INSERT_ORDERED_LIST_COMMAND,
+  REMOVE_LIST_COMMAND,
+  $isListNode,
+} from "@lexical/list";
 
 /* ----------- Badge Node för SharePoint ----------- */
 
@@ -30,97 +37,6 @@ type SharepointFilePayload = {
   name: string;
   source: "SHAREPOINT";
 };
-
-class SharepointFileNode extends DecoratorNode<JSX.Element> {
-  __url: string;
-  __name: string;
-  __source: string;
-
-  static getType() {
-    return "sharepoint-file";
-  }
-
-  static clone(node: SharepointFileNode) {
-    return new SharepointFileNode(
-      node.__url,
-      node.__name,
-      node.__source,
-      node.__key
-    );
-  }
-
-  constructor(url: string, name: string, source: string, key?: string) {
-    super(key);
-    this.__url = url;
-    this.__name = name;
-    this.__source = source;
-  }
-
-  createDOM(): HTMLElement {
-    // Dekorator-noder behöver en DOM-container. Span är vanligt.
-    return document.createElement("span");
-  }
-
-  updateDOM(): false {
-    // Returnera false eftersom renderingen hanteras av React i decorate()
-    return false;
-  }
-
-  static importJSON(serializedNode: any): SharepointFileNode {
-    return new SharepointFileNode(
-      serializedNode.url,
-      serializedNode.name,
-      serializedNode.source,
-      serializedNode.key // Import key if available
-    );
-  }
-
-  exportJSON(): SerializedLexicalNode {
-    return {
-      type: "sharepoint-file",
-      version: 1, // Sätt en version för din nod
-      url: this.__url,
-      name: this.__name,
-      source: this.__source,
-      key: this.getKey(),
-    } as SerializedLexicalNode; // Type assertion for clarity
-  }
-
-  // exportDOM används för att serialisera noden till HTML (t.ex. för copy-paste utanför Lexical)
-  exportDOM(): { element: HTMLElement } {
-    const a = document.createElement("a");
-    a.href = this.__url;
-    a.textContent = this.__name;
-    // Lexical kan behöva veta att detta element representerar noden
-    // a.setAttribute('data-lexical-node-type', this.getType()); // Valfritt men kan hjälpa
-    return { element: a };
-  }
-
-  // decorate renderar React-elementet INUTI editorn
-  decorate(): JSX.Element {
-    return (
-      <a
-        href={this.__url}
-        target="_blank"
-        rel="noopener noreferrer"
-        // Se till att dessa klasser gör elementet synligt och klickbart
-        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-700 text-white mr-1 cursor-pointer"
-        // Förhindra att klick i editorn ändrar markeringen på ett konstigt sätt (valfritt)
-        onMouseDown={(e) => e.preventDefault()}
-      >
-        {this.__name}
-      </a>
-    );
-  }
-
-  // Gör noden "immutable" så att den behandlas som en enda enhet vid markering/deletion
-  isInline(): boolean {
-    return true; // Eller false om du vill att den ska bete sig som ett block
-  }
-
-  // Optional: allow this node to be the direct child of the root
-  // shouldGenerateParentlessJson(): boolean { return true; }
-}
 
 class InlineBadgeNode extends DecoratorNode<JSX.Element> {
   __text: string;
@@ -328,6 +244,27 @@ const CodeIcon = () => (
   </svg>
 );
 
+const BulletListIcon = () => (
+  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+    <circle cx="5" cy="6" r="1.5" />
+    <circle cx="5" cy="12" r="1.5" />
+    <circle cx="5" cy="18" r="1.5" />
+    <rect x="9" y="5" width="12" height="2" rx="1" />
+    <rect x="9" y="11" width="12" height="2" rx="1" />
+    <rect x="9" y="17" width="12" height="2" rx="1" />
+  </svg>
+);
+
+const NumberedListIcon = () => (
+  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+    <text x="3" y="8" fontSize="6" fill="currentColor">1.</text>
+    <text x="3" y="14" fontSize="6" fill="currentColor">2.</text>
+    <text x="3" y="20" fontSize="6" fill="currentColor">3.</text>
+    <rect x="9" y="5" width="12" height="2" rx="1" />
+    <rect x="9" y="11" width="12" height="2" rx="1" />
+    <rect x="9" y="17" width="12" height="2" rx="1" />
+  </svg>
+);
 /* ----------- Toolbar-komponenten ----------- */
 
 export function Toolbar() {
@@ -336,31 +273,38 @@ export function Toolbar() {
     bold: false,
     italic: false,
     underline: false,
-    strikethrough: false
+    strikethrough: false,
+    isBulletList: false,
+    isNumberList: false,
   });
+  
 
   useEffect(() => {
     const updateToolbar = () => {
       const selection = $getSelection();
       if ($isRangeSelection(selection)) {
+        const anchorNode = selection.anchor.getNode();
+        const topLevel = anchorNode.getTopLevelElementOrThrow();
+    
+        const isList = $isListNode(topLevel);
+        const listType = isList ? topLevel.getListType?.() : null;
+    
         setFormats({
           bold: selection.hasFormat("bold"),
           italic: selection.hasFormat("italic"),
           underline: selection.hasFormat("underline"),
-          strikethrough: selection.hasFormat("strikethrough")
+          strikethrough: selection.hasFormat("strikethrough"),
+          isBulletList: listType === "bullet",
+          isNumberList: listType === "number",
         });
       }
     };
-
+  
     return mergeRegister(
       editor.registerUpdateListener(({ editorState }) => {
         editorState.read(updateToolbar);
       }),
-      editor.registerCommand(
-        SELECTION_CHANGE_COMMAND,
-        updateToolbar,
-        COMMAND_PRIORITY_LOW
-      )
+      editor.registerCommand(SELECTION_CHANGE_COMMAND, updateToolbar, COMMAND_PRIORITY_LOW)
     );
   }, [editor]);
 
@@ -396,11 +340,72 @@ export function Toolbar() {
       >
         <StrikethroughIcon />
       </IconButton>
+      <IconButton
+  title="Punktlista"
+  isActive={formats.isBulletList}
+  onClick={() => {
+    editor.dispatchCommand(
+      formats.isBulletList ? REMOVE_LIST_COMMAND : INSERT_UNORDERED_LIST_COMMAND,
+      undefined
+    );
+  }}
+>
+  <BulletListIcon />
+</IconButton>
+
+<IconButton
+  title="Numrerad lista"
+  isActive={formats.isNumberList}
+  onClick={() => {
+    editor.dispatchCommand(
+      formats.isNumberList ? REMOVE_LIST_COMMAND : INSERT_ORDERED_LIST_COMMAND,
+      undefined
+    );
+  }}
+>
+  <NumberedListIcon />
+</IconButton>
     </div>
   );
 }
 
 /* ----------- Paste Plugin (Modifierad med Async Insertion) ----------- */
+
+
+const checkHasContent = () => {
+  const root = $getRoot();
+
+  for (const node of root.getChildren()) {
+    const nodeType = node.getType();
+
+    if (nodeType === "list") {
+      // För listor, kolla varje ListItemNode
+      for (const item of node.getChildren()) {
+        for (const child of item.getChildren()) {
+          if (
+            (child.getType() === "text" &&
+              child.getTextContent().trim() !== "")
+          ) {
+            return true;
+          }
+        }
+      }
+    } else {
+      // För vanliga paragraphs etc
+      for (const child of node.getChildren()) {
+        if (
+          (child.getType() === "text" &&
+            child.getTextContent().trim() !== "") ||
+          child.getType() === "inline-badge"
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+};
 
 function SharepointPastePlugin({
   setFiles,
@@ -421,7 +426,6 @@ function SharepointPastePlugin({
         // 1) Hämta text/plain
         const plain = event.clipboardData?.getData("text/plain") || "";
         const links = extractLinkedFiles(plain);
-        console.log(links);
 
         if (links.length === 0) {
           // Låt Lexical hantera vanlig paste
@@ -522,122 +526,41 @@ function BlurPlugin({
   return null; // Pluginet renderar inget
 }
 
+function CanPostPlugin({
+  onCanPostChange,
+}: {
+  onCanPostChange: (canPost: boolean) => void;
+}) {
+  const [editor] = useLexicalComposerContext();
 
-function useCanPostComment(): boolean {
-    const [canPost, setCanPost] = useState(false);
-    const [editor] = useLexicalComposerContext(); // måste ligga här
-  
-    // SSR-säker: kör bara när `window` finns
-    useEffect(() => {
-      if (typeof window === "undefined") return;
-  
-  
-        const unregister = editor.registerUpdateListener(({ editorState }) => {
-          editorState.read(() => {
-            const root = editorState.getRoot();
-            let hasContent = false;
-  
-            const children = root.getChildren();
-            for (const node of children) {
-              const inner = node.getChildren();
-              for (const child of inner) {
-                const type = child.getType();
-                if (type === "text" && child.getTextContent().trim() !== "") {
-                  hasContent = true;
-                  break;
-                }
-                if (type === "inline-badge") {
-                  hasContent = true;
-                  break;
-                }
-              }
-              if (hasContent) break;
-            }
-  
-            setCanPost(hasContent);
-          
-        });
-  
-        return () => unregister();
-      });
-    }, []);
-  
-    return canPost;
-  }
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      onCanPostChange(null);
+      editor.update(() => {});
+    });
+  }, []);
 
- function useCanPostCommentOld(): boolean {
-    const [editor] = useLexicalComposerContext();
-    const [canPost, setCanPost] = useState(false);
-  
-    useEffect(() => {
-      return editor.registerUpdateListener(({ editorState }) => {
-        editorState.read(() => {
-          const root = $getRoot();
-          let hasContent = false;
-  
-          const children = root.getChildren();
-          for (const node of children) {
-            const inner = node.getChildren();
-            for (const child of inner) {
-              const type = child.getType();
-  
-              if (type === "text" && child.getTextContent().trim() !== "") {
-                hasContent = true;
-                break;
-              }
-  
-              if (type === "inline-badge") {
-                hasContent = true;
-                break;
-              }
-            }
-  
-            if (hasContent) break;
-          }
-  
-          setCanPost(hasContent);
-        });
+  useEffect(() => {
+    return editor.registerUpdateListener(({ editorState }) => {
+      editorState.read(() => {
+        const hasContent = checkHasContent();
+        onCanPostChange(hasContent)
       });
-    }, [editor]);
-  
-    return canPost;
-  }
+    });
+  }, [editor, onCanPostChange]);
 
-  
-export function CanPostPlugin({
-    onCanPostChange,
-  }: {
-    onCanPostChange: (canPost: boolean) => void;
-  }) {
-    const [editor] = useLexicalComposerContext();
-  
-    useEffect(() => {
-      return editor.registerUpdateListener(({ editorState }) => {
-        editorState.read(() => {
-          const root = $getRoot();
-          let hasContent = false;
-  
-          for (const node of root.getChildren()) {
-            for (const child of node.getChildren()) {
-              const type = child.getType();
-              if (
-                (type === "text" && child.getTextContent().trim() !== "") ||
-                type === "inline-badge"
-              ) {
-                hasContent = true;
-                break;
-              }
-            }
-            if (hasContent) break;
-          }
-  
-          onCanPostChange(hasContent);
-        });
-      });
-    }, [editor, onCanPostChange]);
-  
-    return null;
-  }
+  return null;
+}
+
+function DebugListPlugin() {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    console.log("✅ ListPlugin mounted");
+  }, [editor]);
+
+  return <ListPlugin />;
+}
 
 export function RichTextJsonEditor({
   initialJson,
@@ -648,19 +571,17 @@ export function RichTextJsonEditor({
   onBlur: (result: { json: any; files: SharepointFilePayload[] }) => void;
   onCanPostChange?: (canPost: boolean) => void;
 }) {
-
   // Håll state för filer som har infogats via paste
   // Denna state är separat från Lexicals tillstånd men uppdateras samtidigt som noder skapas
   const [files, setFiles] = useState<SharepointFilePayload[]>([]);
   const [focus, setFocus] = useState(false);
-
 
   // Initial konfiguration för Lexical
   const initialConfig = {
     namespace: "Editor", // Unikt namn för editor-instansen
 
     theme: {
-        paragraph: "font-light text-zinc-300 text-sm leading-snug",
+      paragraph: "font-light text-zinc-300 text-sm leading-snug",
       text: {
         bold: "font-bold text-white", // starkare fetstil
         italic: "italic",
@@ -672,7 +593,7 @@ export function RichTextJsonEditor({
     // Hantera Lexical-fel, skriv ut till konsolen
     onError: (error: Error) => console.error("Lexical error:", error),
     // Registrera dina anpassade noder här! Viktigt för serialisering/deserialisering och rendering.
-    nodes: [InlineBadgeNode, SharepointFileNode],
+    nodes: [InlineBadgeNode, ListNode, ListItemNode],
     // Ladda initialt JSON-tillstånd om det finns
     editorState: initialJson
       ? (editor: LexicalEditor) => {
@@ -710,7 +631,10 @@ export function RichTextJsonEditor({
               <ContentEditable
                 onFocus={() => setFocus(true)}
                 onBlur={() => setFocus(false)}
-                className="peer w-full text-sm text-zinc-300 font-light bg-transparent outline-none placeholder-zinc-500 px-3 py-2 min-h-[36px] leading-snug"
+                className="peer w-full text-sm text-zinc-300 font-light bg-transparent outline-none placeholder-zinc-500 px-3 py-2 min-h-[36px] leading-snug
+    [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:pl-4 [&_ul]:text-zinc-300
+    [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:pl-4 [&_ol]:text-zinc-300
+    [&_li]:ml-2 [&_li]:leading-snug"
                 aria-placeholder="Skriv en kommentar..."
               />
             }
@@ -725,6 +649,7 @@ export function RichTextJsonEditor({
             // Standard ErrorBoundary rekommenderas i produktion
             ErrorBoundary={() => ""}
           />
+          <DebugListPlugin />
           <SharepointPastePlugin setFiles={setFiles} />
           <BlurPlugin files={files} onBlur={onBlur} />
           <HistoryPlugin />

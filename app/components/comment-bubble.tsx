@@ -94,7 +94,57 @@ export const DeleteUndoToast = ({
   );
 };
 
-function renderLexicalJsonToReact(json: any): React.ReactNode {
+function FileBadge({
+  name,
+  url,
+  isMine,
+}: {
+  name: string;
+  url?: string;
+  isMine?: boolean;
+}) {
+  const badgeClass = [
+    "inline-flex items-center gap-1 text-xs pr-2 pl-1 py-1 rounded-full transition-colors mb-1",
+    isMine
+      ? "bg-emerald-800 text-zinc-100 hover:bg-zinc-600"
+      : "bg-zinc-950 text-zinc-200 hover:bg-zinc-700",
+  ].join(" ");
+
+  const content = (
+    <>
+      <svg
+        className="w-3 h-3 align-middle shrink-0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21 12.79V7a5 5 0 00-10 0v9a3 3 0 006 0V9"
+        />
+      </svg>
+      <span className="truncate max-w-[70vw]">{name}</span>
+    </>
+  );
+
+  if (url) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={badgeClass}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return <span className={badgeClass}>{content}</span>;
+}
+function renderLexicalJsonToReact(json: any, isMine = false): React.ReactNode {
   const root = json.root ?? json;
   if (!root || root.type !== "root" || !Array.isArray(root.children)) {
     return null;
@@ -104,77 +154,41 @@ function renderLexicalJsonToReact(json: any): React.ReactNode {
   let key = 0;
 
   for (const node of root.children) {
+    // 📌 Hantera paragrafer
     if (node.type === "paragraph" && Array.isArray(node.children)) {
-      const parts: React.ReactNode[] = [];
-
-      for (const child of node.children) {
-        if (child.type === "text") {
-          let className = "";
-          if (child.format) {
-            if (child.format & 1) className += " font-bold";
-            if (child.format & 2) className += " italic";
-            if (child.format & 4) className += " underline";
-            if (child.format & 8) className += " line-through";
-            if (child.format & 16)
-              className += " font-mono bg-zinc-800 px-1 rounded";
-          }
-
-          parts.push(
-            <span key={key++} className={className.trim()}>
-              {child.text}
-            </span>
-          );
-        }
-
-        if (child.type === "inline-badge") {
-          const { text, url } = child;
-          const badgeClass =
-            "inline-flex items-center gap-1 bg-zinc-800 text-zinc-300 text-xs pr-2 pl-1 py-1 rounded-full hover:bg-zinc-700 transition-colors";
-
-          if (url) {
-            parts.push(
-              <a
-                key={key++}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={badgeClass}
-              >
-                <svg
-                  className="w-3 h-3 mt-0.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21 12.79V7a5 5 0 00-10 0v9a3 3 0 006 0V9"
-                  />
-                </svg>{" "}
-                {text}
-              </a>
-            );
-          } else {
-            parts.push(
-              <span key={key++} className={badgeClass}>
-                {text}
-              </span>
-            );
-          }
-
-          parts.push(<span key={key++}> </span>);
-        }
-      }
-
       output.push(
         <div
           key={key++}
           className="mb-2 leading-snug whitespace-pre-wrap break-words"
         >
-          {parts}
+          {renderChildren(node.children, isMine, key++)}
         </div>
+      );
+    }
+
+    // 📌 Hantera listor
+    if (node.type === "list" && Array.isArray(node.children)) {
+      const isOrdered = node.listType === "number";
+      const Tag = isOrdered ? "ol" : "ul";
+
+      output.push(
+        <Tag
+          key={key++}
+          className={`mb-2 ml-5 pl-4 text-zinc-300 ${
+            isOrdered ? "list-decimal" : "list-disc"
+          } [&_li]:ml-2 [&_li]:leading-snug`}
+        >
+          {node.children.map((li: any, idx: number) => {
+            if (li.type === "listitem") {
+              return (
+                <li key={key++} className="mb-1">
+                  {renderChildren(li.children ?? [], isMine, key++)}
+                </li>
+              );
+            }
+            return null;
+          })}
+        </Tag>
       );
     }
   }
@@ -182,7 +196,69 @@ function renderLexicalJsonToReact(json: any): React.ReactNode {
   return output;
 }
 
-export function CommentContent({ content }: { content: any }) {
+function renderChildren(
+  children: any[],
+  isMine: boolean,
+  keyStart: number
+): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let key = keyStart;
+
+  for (const child of children) {
+    if (child.type === "text") {
+      let className = "";
+      if (child.format) {
+        if (child.format & 1) className += " font-bold";
+        if (child.format & 2) className += " italic";
+        if (child.format & 4) className += " underline";
+        if (child.format & 8) className += " line-through";
+        if (child.format & 16)
+          className += " font-mono bg-zinc-800 px-1 rounded";
+      }
+
+      parts.push(
+        <span key={key++} className={className.trim()}>
+          {child.text}
+        </span>
+      );
+    }
+
+    if (child.type === "inline-badge") {
+      const { text, url } = child;
+
+      const badgeClass = [
+        "inline-flex items-center gap-1 text-xs pr-2 pl-1 py-1 rounded-full transition-colors mb-1",
+        isMine
+          ? "bg-emerald-800 text-zinc-100 hover:bg-zinc-600"
+          : "bg-zinc-950 text-zinc-200 hover:bg-zinc-700",
+      ].join(" ");
+
+      if (url) {
+        parts.push(
+          <FileBadge key={key++} name={text} url={url} isMine={isMine} />
+        );
+      } else {
+        parts.push(
+          <span key={key++} className={badgeClass}>
+            {text}
+          </span>
+        );
+      }
+
+      parts.push(<span key={key++}> </span>);
+    }
+  }
+
+  return parts;
+}
+
+export function CommentContent({
+  content,
+  isMine,
+}: {
+  content: any;
+  isMine?: boolean;
+}) {
   const MAX_HEIGHT = 80;
   const containerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -202,7 +278,7 @@ export function CommentContent({ content }: { content: any }) {
         className={`transition-all overflow-hidden`}
       >
         <div className="leading-snug whitespace-pre-wrap break-words space-y-1">
-          {renderLexicalJsonToReact(content)}
+          {renderLexicalJsonToReact(content, isMine)}
         </div>
       </div>
 
@@ -256,7 +332,7 @@ export function CommentBubble({
 
   return (
     <div
-      className={`relative group flex items-end gap-2  ${
+      className={`relative group flex gap-2  ${
         isMine ? "justify-end" : "justify-start"
       }`}
       {...(isMine ? bindProps : {})}
@@ -284,35 +360,22 @@ export function CommentBubble({
             {timeAgo(new Date(comment.createdAt))}
           </div>
 
-          <CommentContent content={JSON.parse(comment.content)} />
+          <CommentContent
+            content={JSON.parse(comment.content)}
+            isMine={isMine}
+          />
 
           {comment.files.length > 0 && (
             <div className="flex-1 overflow-y-auto px-4 pl-0 flex-1 overflow-y-auto  pt-4">
               {comment.files.map((file: any) => (
-                <a
+                <FileBadge
                   key={file.id}
-                  href={
+                  name={file.name}
+                  url={
                     file.source === "S3" ? `/api/files/${file.id}` : file.url
                   }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 bg-zinc-800 text-zinc-300  text-xs pr-2 pl-1 py-1 rounded-full hover:bg-zinc-600 transition-colors"
-                >
-                  <svg
-                    className="w-3 h-3 mt-0.5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 12.79V7a5 5 0 00-10 0v9a3 3 0 006 0V9"
-                    />
-                  </svg>
-                  {file.name}
-                </a>
+                  isMine={isMine}
+                />
               ))}
             </div>
           )}
