@@ -98,14 +98,18 @@ function FileBadge({
   name,
   url,
   isMine,
+  isBeingEdited,
 }: {
   name: string;
   url?: string;
   isMine?: boolean;
+  isBeingEdited?: boolean;
 }) {
   const badgeClass = [
     "inline-flex items-center gap-1 text-xs pr-2 pl-1 py-1 rounded-full transition-colors mb-1 mr-1",
-    isMine
+    isBeingEdited
+      ? "bg-purple-800 text-purple-100 hover:bg-purple-700"
+      : isMine
       ? "bg-emerald-800 text-zinc-100 hover:bg-zinc-600"
       : "bg-zinc-950 text-zinc-200 hover:bg-zinc-700",
   ].join(" ");
@@ -145,7 +149,7 @@ function FileBadge({
   return <span className={badgeClass}>{content}</span>;
 }
 
-function renderLexicalJsonToReact(json: any, isMine = false): React.ReactNode {
+function renderLexicalJsonToReact(json: any, isMine = false, isBeingEdited = false): React.ReactNode {
   const root = json.root ?? json;
   if (!root || root.type !== "root" || !Array.isArray(root.children)) {
     return null;
@@ -168,7 +172,7 @@ function renderLexicalJsonToReact(json: any, isMine = false): React.ReactNode {
           key={key++}
           className="mb-2 leading-snug whitespace-pre-wrap break-words"
         >
-          {renderChildren(node.children, isMine, key++)}
+          {renderChildren(node.children, isMine,isBeingEdited, key++)}
         </div>
       );
       continue;
@@ -190,7 +194,7 @@ function renderLexicalJsonToReact(json: any, isMine = false): React.ReactNode {
             if (li.type === "listitem") {
               return (
                 <li key={key++}>
-                  {renderChildren(li.children ?? [], isMine, key++)}
+                  {renderChildren(li.children ?? [], isMine, isBeingEdited, key++)}
                 </li>
               );
             }
@@ -207,6 +211,7 @@ function renderLexicalJsonToReact(json: any, isMine = false): React.ReactNode {
 function renderChildren(
   children: any[],
   isMine: boolean,
+  isBeingEdited: boolean,
   keyStart: number
 ): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
@@ -243,7 +248,7 @@ function renderChildren(
 
       if (url) {
         parts.push(
-          <FileBadge key={key++} name={text} url={url} isMine={isMine} />
+          <FileBadge key={key++}  name={text} url={url} isMine={isMine} isBeingEdited={isBeingEdited} />
         );
       } else {
         parts.push(
@@ -263,9 +268,11 @@ function renderChildren(
 export function CommentContent({
   content,
   isMine,
+  isBeingEdited
 }: {
   content: any;
   isMine?: boolean;
+  isBeingEdited?: boolean;
 }) {
   const MAX_HEIGHT = 80;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -286,7 +293,7 @@ export function CommentContent({
         className={`transition-all overflow-hidden`}
       >
         <div className="leading-snug whitespace-pre-wrap break-words space-y-1">
-          {renderLexicalJsonToReact(content, isMine)}
+          {renderLexicalJsonToReact(content, isMine, isBeingEdited)}
         </div>
       </div>
 
@@ -311,6 +318,9 @@ export function CommentBubble({
   prevUserId,
   dbUserId,
   deleteFetcher,
+  onEditRequest,
+  onCancelEdit,
+  editingCommentId
 }: {
   comment: any;
   prevUserId?: string;
@@ -320,6 +330,9 @@ export function CommentBubble({
     deletedCommentId?: string;
     error?: string;
   }>;
+  onEditRequest?: () => void;
+  onCancelEdit?: () => void;
+  editingCommentId?: string;
 }) {
   const isMine = comment.user.id === dbUserId;
   const isSameUser = prevUserId === comment.user.id;
@@ -327,6 +340,8 @@ export function CommentBubble({
   const { activeId, bind, clear } = useLongHoverPress(500);
   const bindProps = bind(comment.id);
   const showMenu = activeId === comment.id;
+  const isBeingEdited = editingCommentId === comment.id;
+
 
   const handleDeleteClick = () => {
     setIsVisible(false);
@@ -357,20 +372,41 @@ export function CommentBubble({
         }`}
       >
         <div
-          className={`rounded-xl px-4 py-2 text-sm leading-snug ${
-            isMine
-              ? "bg-emerald-950 text-white"
-              : "bg-zinc-900 text-white text-sm"
+         className={`rounded-xl px-4 py-2 text-sm leading-snug border transition-all ${
+            isBeingEdited
+              ? "border-purple-950 bg-purple-950"
+              : isMine
+              ? "bg-emerald-950 border-transparent"
+              : "bg-zinc-900 border-transparent"
           }`}
         >
           <div className="text-xs text-zinc-400 mb-1">
             {!isMine && !isSameUser && `${comment.user.name} • `}
             {timeAgo(new Date(comment.createdAt))}
+            {isBeingEdited && (
+              <>
+              <span className="text-purple-400 font-semibold ml-2">
+                Redigerar… 
+              </span>
+              <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancelEdit?.();
+              }}
+              className="ml-4 text-purple-300 hover:text-white underline"
+            >
+              Avbryt
+            </button>
+            </>
+            )}
+          
           </div>
+         
 
           <CommentContent
             content={JSON.parse(comment.content)}
             isMine={isMine}
+            isBeingEdited={isBeingEdited}
           />
 
           {comment.files.length > 0 && (
@@ -383,6 +419,7 @@ export function CommentBubble({
                     file.source === "S3" ? `/api/files/${file.id}` : file.url
                   }
                   isMine={isMine}
+                  isBeingEdited={isBeingEdited}
                 />
               ))}
             </div>
@@ -393,7 +430,10 @@ export function CommentBubble({
           <>
             <div className="hidden sm:flex absolute -top-3 -right-0 flex items-center gap-1 bg-white rounded-lg shadow-lg pl-1 pr-1 z-50">
               <button
-                onClick={() => console.log("Redigera")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditRequest?.(); // 👈 nytt
+                }}
                 className="text-zinc-300 hover:text-white p-1"
               >
                 <svg

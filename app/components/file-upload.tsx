@@ -1,6 +1,7 @@
 // file-upload.tsx
 import { useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
+import { getS3KeyFromUrl } from "~/utils/s3.shared";
 
 interface TaskForComponent {
   id: string;
@@ -20,6 +21,7 @@ interface UploadingFile {
   file: File;
   progress: number;
   uploaded: boolean;
+  markedForDeletion?: boolean;
   result?: UploadedFile;
 }
 
@@ -37,6 +39,8 @@ interface FileBadgeProps {
   filename?: string;
   onRemove?: () => void;
 }
+
+
 
 export function FileBadge({
   uploaded,
@@ -66,6 +70,7 @@ export function FileBadge({
       {onRemove && (
         <button
           onClick={onRemove}
+          type={"button"}
           className="absolute -top-1 -right-0.5 w-4 h-4 bg-zinc-700 rounded-full flex items-center justify-center hover:bg-red-600 group-hover:opacity-100 opacity-0 transition-opacity z-20"
           title="Ta bort fil"
         >
@@ -185,13 +190,47 @@ export function FileUploader({
         className="hidden"
       />
 
-      {uploadingFiles.map((f) => (
+      {uploadingFiles.filter((f) => !f.markedForDeletion).map((f) => (
         <FileBadge
           key={f.id}
           uploaded={f.uploaded}
           progress={f.progress}
           extension={getExtension(f.file?.name)}
-          onRemove={() => {
+          onRemove={async () => {
+
+            
+            const isExisting = f.result?.existing;
+
+            if (isExisting) {
+
+              setUploadingFiles((prev) =>
+                prev.map((x) =>
+                  x.id === f.id ? { ...x, markedForDeletion: true } : x
+                )
+              );
+              return; 
+            } else {
+              // 🟢 Nya filer = OK att ta bort från S3 direkt
+              const key = f.result?.url ? getS3KeyFromUrl(f.result.url) : null;
+              if (key) {
+                const formData = new FormData();
+                formData.append("key", key);
+          
+                try {
+                  const res = await fetch("/api/files/remove", {
+                    method: "POST",
+                    body: formData,
+                  });
+          
+                  const json = await res.json();
+                  if (!json.success) {
+                    console.error("Failed to delete from S3", json.error);
+                  }
+                } catch (err) {
+                  console.error("Error deleting from S3", err);
+                }
+              }
+            }
             setUploadingFiles((prev) => prev.filter((x) => x.id !== f.id));
           }}
         />

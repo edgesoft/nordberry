@@ -20,6 +20,9 @@ import { CommentBubble, DeleteUndoToast } from "../components/comment-bubble";
 import { sourceMatchers } from "~/utils/sourceMatcher";
 import toast from "react-hot-toast";
 import { RichTextJsonEditor } from "~/components/editor/RichTextJsonEditor";
+import { S3Storage } from "~/utils/s3.storage.driver.server";
+import { getS3KeyFromUrl } from "~/utils/s3.shared";
+import { v4 as uuidv4 } from "uuid";
 
 export const loader = async (args) => {
   await requireUser(args, { requireActiveStatus: true });
@@ -104,40 +107,125 @@ export function extractLinkedFiles(content: string) {
 export const action = async (args) => {
   const { userId } = await getAuth(args);
   if (!userId) return new Response("Unauthorized", { status: 401 });
+
   const { request } = args;
   const formData = await request.formData();
+
   const content = formData.get("content")?.toString().trim();
   const taskId = formData.get("taskId")?.toString();
+  const commentId = formData.get("commentId")?.toString();
   const uploadedFilesRaw = formData.getAll("uploadedFiles") as string[];
-  const uploadedFiles: UploadedFile[] = uploadedFilesRaw.map((f) =>
-    JSON.parse(f)
-  );
 
-  if (!content || !taskId)
+  console.log("📥 uploadedFilesRaw:", uploadedFilesRaw);
+
+  const uploadedFiles: UploadedFile[] = uploadedFilesRaw.map((f) => {
+    try {
+      return JSON.parse(f);
+    } catch (err) {
+      console.error("❌ Failed to parse uploadedFile:", f);
+      return null;
+    }
+  }).filter(Boolean);
+
+  console.log("📦 parsed uploadedFiles:", uploadedFiles);
+
+  if (!content || !taskId) {
     return json({ error: "Invalid data" }, { status: 400 });
+  }
 
   const dbUser = await prisma.user.findUnique({
     where: { clerkUserId: userId },
   });
 
-  const comment = await prisma.comment.create({
-    data: {
-      content,
-      taskId,
-      userId: dbUser.id,
-    },
-  });
+  if (!dbUser) return json({ error: "User not found" }, { status: 404 });
 
-  if (uploadedFiles.length > 0) {
-    await prisma.file.createMany({
-      data: uploadedFiles.map((file) => ({
-        name: file.name,
-        url: file.url,
-        source: file.source,
-        userId: dbUser.id,
-        commentId: comment.id,
-      })),
+  const s3 = new S3Storage();
+  let comment;
+
+  if (commentId) {
+    // 🟡 Uppdatera befintlig kommentar
+    comment = await prisma.comment.update({
+      where: { id: commentId },
+      data: {
+        content,
+        editedAt: new Date(),
+      },
     });
+
+    // 🔴 Ta bort filer som är markedForDeletion
+    const filesToDelete = uploadedFiles.filter(
+      (f) => f.existing && f.markedForDeletion
+    );
+
+    console.log("🗑️ filesToDelete:", filesToDelete);
+
+    if (filesToDelete.length > 0) {
+      for (const file of filesToDelete) {
+        const rawKey = getS3KeyFromUrl(file.url);
+        const key = decodeURIComponent(rawKey);
+        if (key) {
+          try {
+            await s3.remove(key);
+            console.log("✅ S3 deleted:", key);
+          } catch (err) {
+            console.error("❌ S3 deletion failed:", key, err);
+          }
+        } else {
+          console.warn("⚠️ Missing or invalid S3 key for:", file.url);
+        }
+      }
+
+      await prisma.file.deleteMany({
+        where: {
+          commentId,
+          url: { in: filesToDelete.map((f) => f.url) },
+        },
+      });
+    }
+
+    // 🟢 Lägg till nya filer (som inte är markedForDeletion)
+    const newFiles = uploadedFiles.filter(
+      (f) => !f.existing && !f.markedForDeletion
+    );
+
+    console.log("📤 newFiles to add:", newFiles);
+
+    if (newFiles.length > 0) {
+      await prisma.file.createMany({
+        data: newFiles.map((file) => ({
+          name: file.name,
+          url: file.url,
+          source: file.source,
+          userId: dbUser.id,
+          commentId: comment.id,
+        })),
+      });
+    }
+  } else {
+    // 🆕 Ny kommentar
+    comment = await prisma.comment.create({
+      data: {
+        content,
+        taskId,
+        userId: dbUser.id,
+      },
+    });
+
+    const validFiles = uploadedFiles.filter((f) => !f.markedForDeletion);
+
+    console.log("🆕 create new comment with files:", validFiles);
+
+    if (validFiles.length > 0) {
+      await prisma.file.createMany({
+        data: validFiles.map((file) => ({
+          name: file.name,
+          url: file.url,
+          source: file.source,
+          userId: dbUser.id,
+          commentId: comment.id,
+        })),
+      });
+    }
   }
 
   return json({ success: true });
@@ -314,11 +402,11 @@ export default function TaskView() {
   const fetcher = useFetcher();
   const commentDeleteFetcher = useFetcher();
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
-  const [toastShownForId, setToastShownForId] = useState<string | null>(null);
   const [canPost, setCanPost] = useState(false);
   const [commentJson, setCommentJson] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const [toastHistory, setToastHistory] = useState<Record<string, number>>({});
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 
   useNordEvent((payload) => {
     if (
@@ -334,8 +422,12 @@ export default function TaskView() {
   const uploadedFiles = useMemo(
     () =>
       uploadingFiles
-        .filter((f) => f.uploaded && f.result)
-        .map((f) => f.result!),
+        .filter((f) => f.result || f.markedForDeletion)
+        .map((f) => ({
+          ...f.result!,
+          existing: f.result?.existing ?? false,
+          markedForDeletion: f.markedForDeletion ?? false,
+        })),
     [uploadingFiles]
   );
 
@@ -350,25 +442,26 @@ export default function TaskView() {
       setCanPost(false);
       setResetKey((k) => k + 1);
       setUploadingFiles([]);
+      setEditingCommentId(null)
     }
   }, [fetcher.state, fetcher.data]);
 
   useEffect(() => {
     const deletedId = commentDeleteFetcher.data?.deletedCommentId;
     const now = Date.now();
-  
+
     const lastShown = deletedId ? toastHistory[deletedId] : null;
     const recentlyShown = lastShown && now - lastShown < 2000;
-  
+
     const shouldShowToast =
       commentDeleteFetcher.state === "idle" &&
       commentDeleteFetcher.data?.success &&
       deletedId &&
       !recentlyShown;
-  
+
     if (shouldShowToast) {
       setToastHistory((prev) => ({ ...prev, [deletedId]: now }));
-  
+
       toast.custom(
         (t) => (
           <DeleteUndoToast
@@ -382,12 +475,14 @@ export default function TaskView() {
         { duration: 5000 }
       );
     }
-  
+
     if (
       commentDeleteFetcher.state === "idle" &&
       commentDeleteFetcher.data?.error
     ) {
-      toast.error(`Kunde inte ta bort kommentar: ${commentDeleteFetcher.data.error}`);
+      toast.error(
+        `Kunde inte ta bort kommentar: ${commentDeleteFetcher.data.error}`
+      );
       revalidator.revalidate();
     }
   }, [
@@ -415,18 +510,21 @@ export default function TaskView() {
     [canPost, task.status, hasUnfinishedUploads]
   );
 
-  const renderSteps = useMemo(() => (
-    <div className="flex flex-wrap gap-2">
-      {chain.tasks.map((t) => (
-        <TaskStep
-          loggedInDbUserId={dbUser.id}
-          key={t.id}
-          step={t}
-          useLink={true}
-        />
-      ))}
-    </div>
-  ), [chain.tasks, dbUser.id]);
+  const renderSteps = useMemo(
+    () => (
+      <div className="flex flex-wrap gap-2">
+        {chain.tasks.map((t) => (
+          <TaskStep
+            loggedInDbUserId={dbUser.id}
+            key={t.id}
+            step={t}
+            useLink={true}
+          />
+        ))}
+      </div>
+    ),
+    [chain.tasks, dbUser.id]
+  );
 
   const renderComments = useMemo(() => {
     if (task.comments.length === 0) return null;
@@ -441,12 +539,40 @@ export default function TaskView() {
               dbUserId={dbUser?.id}
               prevUserId={prev?.user.id}
               deleteFetcher={commentDeleteFetcher}
+              editingCommentId={editingCommentId}
+              onEditRequest={() => {
+                setEditingCommentId(comment.id);
+                setCommentJson(comment.content); // den är redan JSON-string
+                setCanPost(true);
+                setResetKey((k) => k + 1); 
+                setUploadingFiles(
+                  comment.files.map((f) => ({
+                    id: uuidv4(),
+                    file: { name: f.name },
+                    uploaded: true,
+                    progress: 100,
+                    result: {
+                      name: f.name,
+                      url: f.url,
+                      source: f.source,
+                      existing: true, // 🟢 detta är det viktiga!
+                    },
+                  }))
+                );
+              }}
+              onCancelEdit={() => {
+                setEditingCommentId(undefined);
+                setCommentJson("");
+                setCanPost(false);
+                setResetKey((k) => k + 1);
+                setUploadingFiles([]);
+              }}
             />
           );
         })}
       </div>
     );
-  }, [task.comments, dbUser?.id, commentDeleteFetcher]);
+  }, [task.comments, dbUser?.id, commentDeleteFetcher, editingCommentId]);
 
   return (
     <>
@@ -477,7 +603,7 @@ export default function TaskView() {
             <fetcher.Form method="post">
               <RichTextJsonEditor
                 key={resetKey}
-                initialJson={commentJson}
+                initialJson={commentJson ? JSON.parse(commentJson) : undefined}
                 onCanPostChange={setCanPost}
                 onBlur={(data) => {
                   const serialized = JSON.stringify(data.json);
@@ -499,8 +625,7 @@ export default function TaskView() {
                               uploaded: true,
                               progress: 100,
                               result: uploaded.find(
-                                (u) =>
-                                  u.name === f.file.name && u.url === f.url
+                                (u) => u.name === f.file.name && u.url === f.url
                               ),
                             }
                           : f
@@ -512,6 +637,13 @@ export default function TaskView() {
                   task={task}
                 />
                 <input type="hidden" name="taskId" value={task.id} />
+                {editingCommentId && (
+                  <input
+                    type="hidden"
+                    name="commentId"
+                    value={editingCommentId}
+                  />
+                )}
                 {commentJson && (
                   <input type="hidden" name="content" value={commentJson} />
                 )}
@@ -520,7 +652,11 @@ export default function TaskView() {
                     key={`${file.url}-${file.name}`}
                     type="hidden"
                     name="uploadedFiles"
-                    value={JSON.stringify(file)}
+                    value={JSON.stringify({
+                      ...file,
+                      existing: file.existing ?? false,
+                      markedForDeletion: file.markedForDeletion ?? false,
+                    })}
                   />
                 ))}
                 <button
@@ -551,4 +687,3 @@ export default function TaskView() {
     </>
   );
 }
-
