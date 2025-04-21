@@ -2,8 +2,7 @@ import { useLongHoverPress } from "../hooks/useLongHoverPress";
 import Avatar from "../components/avatar";
 import { useFetcher } from "@remix-run/react";
 import toast from "react-hot-toast";
-import { sourceMatchers } from "~/utils/sourceMatcher";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { type FetcherWithComponents } from "@remix-run/react";
 
 function timeAgo(date: Date): string {
@@ -183,6 +182,47 @@ function renderLexicalJsonToReact(json: any): React.ReactNode {
   return output;
 }
 
+
+export function CommentContent({ content }: { content: any }) {
+  const MAX_HEIGHT = 80;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setIsOverflowing(containerRef.current.scrollHeight > MAX_HEIGHT);
+    }
+  }, [content]);
+
+  return (
+    <div className="relative">
+      <div
+        ref={containerRef}
+        style={{ maxHeight: isExpanded ? "none" : MAX_HEIGHT }}
+        className={`transition-all overflow-hidden`}
+      >
+        <div className="leading-snug whitespace-pre-wrap break-words space-y-1">
+          {renderLexicalJsonToReact(content)}
+        </div>
+      </div>
+
+      {!isExpanded && isOverflowing && (
+        <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none" />
+      )}
+
+      {isOverflowing && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="text-xs text-zinc-400 hover:text-white mt-2"
+        >
+          {isExpanded ? "Visa mindre" : "Visa mer"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function CommentBubble({
   comment,
   prevUserId,
@@ -242,7 +282,7 @@ export function CommentBubble({
             {timeAgo(new Date(comment.createdAt))}
           </div>
 
-          {renderLexicalJsonToReact(JSON.parse(comment.content))}
+          <CommentContent content={(JSON.parse(comment.content))}/>
 
           {comment.files.length > 0 && (
             <div className="flex-1 overflow-y-auto px-4 pb-20 flex-1 overflow-y-auto px-4 pt-4">
