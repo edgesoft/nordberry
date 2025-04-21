@@ -336,8 +336,7 @@ export function Toolbar() {
     bold: false,
     italic: false,
     underline: false,
-    strikethrough: false,
-    code: false,
+    strikethrough: false
   });
 
   useEffect(() => {
@@ -348,8 +347,7 @@ export function Toolbar() {
           bold: selection.hasFormat("bold"),
           italic: selection.hasFormat("italic"),
           underline: selection.hasFormat("underline"),
-          strikethrough: selection.hasFormat("strikethrough"),
-          code: selection.hasFormat("code"),
+          strikethrough: selection.hasFormat("strikethrough")
         });
       }
     };
@@ -397,13 +395,6 @@ export function Toolbar() {
         }
       >
         <StrikethroughIcon />
-      </IconButton>
-      <IconButton
-        title="Code"
-        isActive={formats.code}
-        onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "code")}
-      >
-        <CodeIcon />
       </IconButton>
     </div>
   );
