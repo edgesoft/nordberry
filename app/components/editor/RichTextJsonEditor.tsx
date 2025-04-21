@@ -257,9 +257,15 @@ const BulletListIcon = () => (
 
 const NumberedListIcon = () => (
   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-    <text x="3" y="8" fontSize="6" fill="currentColor">1.</text>
-    <text x="3" y="14" fontSize="6" fill="currentColor">2.</text>
-    <text x="3" y="20" fontSize="6" fill="currentColor">3.</text>
+    <text x="3" y="8" fontSize="6" fill="currentColor">
+      1.
+    </text>
+    <text x="3" y="14" fontSize="6" fill="currentColor">
+      2.
+    </text>
+    <text x="3" y="20" fontSize="6" fill="currentColor">
+      3.
+    </text>
     <rect x="9" y="5" width="12" height="2" rx="1" />
     <rect x="9" y="11" width="12" height="2" rx="1" />
     <rect x="9" y="17" width="12" height="2" rx="1" />
@@ -277,7 +283,6 @@ export function Toolbar() {
     isBulletList: false,
     isNumberList: false,
   });
-  
 
   useEffect(() => {
     const updateToolbar = () => {
@@ -285,10 +290,10 @@ export function Toolbar() {
       if ($isRangeSelection(selection)) {
         const anchorNode = selection.anchor.getNode();
         const topLevel = anchorNode.getTopLevelElementOrThrow();
-    
+
         const isList = $isListNode(topLevel);
         const listType = isList ? topLevel.getListType?.() : null;
-    
+
         setFormats({
           bold: selection.hasFormat("bold"),
           italic: selection.hasFormat("italic"),
@@ -299,12 +304,16 @@ export function Toolbar() {
         });
       }
     };
-  
+
     return mergeRegister(
       editor.registerUpdateListener(({ editorState }) => {
         editorState.read(updateToolbar);
       }),
-      editor.registerCommand(SELECTION_CHANGE_COMMAND, updateToolbar, COMMAND_PRIORITY_LOW)
+      editor.registerCommand(
+        SELECTION_CHANGE_COMMAND,
+        updateToolbar,
+        COMMAND_PRIORITY_LOW
+      )
     );
   }, [editor]);
 
@@ -341,36 +350,39 @@ export function Toolbar() {
         <StrikethroughIcon />
       </IconButton>
       <IconButton
-  title="Punktlista"
-  isActive={formats.isBulletList}
-  onClick={() => {
-    editor.dispatchCommand(
-      formats.isBulletList ? REMOVE_LIST_COMMAND : INSERT_UNORDERED_LIST_COMMAND,
-      undefined
-    );
-  }}
->
-  <BulletListIcon />
-</IconButton>
+        title="Punktlista"
+        isActive={formats.isBulletList}
+        onClick={() => {
+          editor.dispatchCommand(
+            formats.isBulletList
+              ? REMOVE_LIST_COMMAND
+              : INSERT_UNORDERED_LIST_COMMAND,
+            undefined
+          );
+        }}
+      >
+        <BulletListIcon />
+      </IconButton>
 
-<IconButton
-  title="Numrerad lista"
-  isActive={formats.isNumberList}
-  onClick={() => {
-    editor.dispatchCommand(
-      formats.isNumberList ? REMOVE_LIST_COMMAND : INSERT_ORDERED_LIST_COMMAND,
-      undefined
-    );
-  }}
->
-  <NumberedListIcon />
-</IconButton>
+      <IconButton
+        title="Numrerad lista"
+        isActive={formats.isNumberList}
+        onClick={() => {
+          editor.dispatchCommand(
+            formats.isNumberList
+              ? REMOVE_LIST_COMMAND
+              : INSERT_ORDERED_LIST_COMMAND,
+            undefined
+          );
+        }}
+      >
+        <NumberedListIcon />
+      </IconButton>
     </div>
   );
 }
 
 /* ----------- Paste Plugin (Modifierad med Async Insertion) ----------- */
-
 
 const checkHasContent = () => {
   const root = $getRoot();
@@ -383,8 +395,8 @@ const checkHasContent = () => {
       for (const item of node.getChildren()) {
         for (const child of item.getChildren()) {
           if (
-            (child.getType() === "text" &&
-              child.getTextContent().trim() !== "")
+            child.getType() === "text" &&
+            child.getTextContent().trim() !== ""
           ) {
             return true;
           }
@@ -544,7 +556,7 @@ function CanPostPlugin({
     return editor.registerUpdateListener(({ editorState }) => {
       editorState.read(() => {
         const hasContent = checkHasContent();
-        onCanPostChange(hasContent)
+        onCanPostChange(hasContent);
       });
     });
   }, [editor, onCanPostChange]);
