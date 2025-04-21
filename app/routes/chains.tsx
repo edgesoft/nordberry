@@ -32,7 +32,7 @@ export async function loader(args: LoaderArgs) {
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "asc" },
     include: {
       tasks: {
         orderBy: { sortOrder: "asc" },
