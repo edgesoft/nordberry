@@ -19,7 +19,7 @@ export const action = async ({ request }) => {
   const fileName = `${Date.now()}-${file.name}`;
   const filePath = `${taskId}/${fileName}`;
   const uploadParams = {
-    Bucket: "nordberry-stage",
+    Bucket: process.env.S3_BUCKET_NAME,
     Key: filePath,
     Body: fileBuffer,
     ContentType: file.type,
