@@ -9,16 +9,12 @@ import {
 } from "@aws-sdk/client-s3";
 import type { FileStorage } from "@mjackson/file-storage";
 
-const s3Client = new S3Client({
-  region: process.env.AWS_S3_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY!,
-  },
-});
+import { s3Client, S3_BUCKET_NAME } from "./s3.server";
+
+
 
 export class S3Storage implements FileStorage {
-  bucket = "my-bucket";
+  bucket = S3_BUCKET_NAME;
 
   async has(key: string): Promise<boolean> {
     try {
