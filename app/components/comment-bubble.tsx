@@ -182,7 +182,6 @@ function renderLexicalJsonToReact(json: any): React.ReactNode {
   return output;
 }
 
-
 export function CommentContent({ content }: { content: any }) {
   const MAX_HEIGHT = 80;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -244,7 +243,6 @@ export function CommentBubble({
   const { activeId, bind, clear } = useLongHoverPress(500);
   const bindProps = bind(comment.id);
   const showMenu = activeId === comment.id;
-  
 
   const handleDeleteClick = () => {
     setIsVisible(false);
@@ -269,7 +267,11 @@ export function CommentBubble({
         <div className="w-8 flex-shrink-0" />
       )}
 
-      <div className="w-fit max-w-[85vw] relative">
+      <div
+        className={`relative w-full ${
+          isMine ? "max-w-[75vw] ml-auto" : "max-w-[75vw] mr-auto"
+        }`}
+      >
         <div
           className={`rounded-xl px-4 py-2 text-sm leading-snug ${
             isMine
@@ -282,10 +284,10 @@ export function CommentBubble({
             {timeAgo(new Date(comment.createdAt))}
           </div>
 
-          <CommentContent content={(JSON.parse(comment.content))}/>
+          <CommentContent content={JSON.parse(comment.content)} />
 
           {comment.files.length > 0 && (
-            <div className="flex-1 overflow-y-auto px-4 pb-20 flex-1 overflow-y-auto px-4 pt-4">
+            <div className="flex-1 overflow-y-auto px-4 flex-1 overflow-y-auto px-4 pt-4">
               {comment.files.map((file: any) => (
                 <a
                   key={file.id}
@@ -351,10 +353,7 @@ export function CommentBubble({
             {/* Mobil meny – visas endast på små skärmar */}
             <div className="sm:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm">
               {/* Klick utanför stänger */}
-              <div
-                className="absolute inset-0"
-                onClick={() => clear()}
-              />
+              <div className="absolute inset-0" onClick={() => clear()} />
 
               <div
                 className="w-full bg-zinc-900 rounded-t-2xl p-4 z-10 space-y-4"
