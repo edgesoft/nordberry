@@ -478,6 +478,7 @@ export function CommentBubble({
                   onClick={(e) => {
                     e.stopPropagation();
                     onEditRequest?.();
+                    clear()
                   }}
                   className="flex items-center space-x-3 text-white hover:text-green-400 transition"
                 >
