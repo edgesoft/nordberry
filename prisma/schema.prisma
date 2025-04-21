@@ -135,6 +135,7 @@ model Comment {
   content   String
   createdAt DateTime @default(now())
   deletedAt DateTime? // Fält för mjuk radering
+  editedAt DateTime?
   taskId    String
   userId    String
 
