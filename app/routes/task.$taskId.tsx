@@ -44,7 +44,7 @@ export const loader = async (args) => {
               status: true,
               assignments: {
                 select: {
-                  userId: true, // Vi behöver bara userId för jämförelsen i TaskStep
+                  userId: true,
                 },
               },
             },
@@ -61,7 +61,7 @@ export const loader = async (args) => {
           deletedAt: null,
         },
         orderBy: {
-          createdAt: "asc", // eller "desc" om du vill ha senaste först
+          createdAt: "asc"
         },
         include: {
           user: { select: { id: true, name: true, imageUrl: true } },
@@ -543,7 +543,6 @@ export default function TaskView() {
               onEditRequest={() => {
                 setEditingCommentId(comment.id);
                 setCommentJson(comment.content); // den är redan JSON-string
-                setCanPost(true);
                 setResetKey((k) => k + 1); 
                 setUploadingFiles(
                   comment.files.map((f) => ({
@@ -555,10 +554,13 @@ export default function TaskView() {
                       name: f.name,
                       url: f.url,
                       source: f.source,
-                      existing: true, // 🟢 detta är det viktiga!
+                      existing: true
                     },
                   }))
                 );
+                setTimeout(() => {
+                  setCanPost(true); 
+                }, 10);
               }}
               onCancelEdit={() => {
                 setEditingCommentId(undefined);

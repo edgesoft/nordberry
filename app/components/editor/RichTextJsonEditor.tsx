@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
@@ -519,7 +519,6 @@ function BlurPlugin({
     }
 
     const handleBlur = () => {
-      console.log("Editor blurrad. Sparar tillstånd.");
       editor.update(() => {
         const json = editor.getEditorState().toJSON();
         onBlur({ json, files }); // Skicka både editor state JSON och fil-listan
@@ -530,7 +529,6 @@ function BlurPlugin({
 
     // Cleanup function för att ta bort event listener
     return () => {
-      console.log("Blur Listener avregistrerad.");
       el.removeEventListener("blur", handleBlur);
     };
   }, [editor, files, onBlur]); // Beroenden: editor, files, onBlur
@@ -564,15 +562,6 @@ function CanPostPlugin({
   return null;
 }
 
-function DebugListPlugin() {
-  const [editor] = useLexicalComposerContext();
-
-  useEffect(() => {
-    console.log("✅ ListPlugin mounted");
-  }, [editor]);
-
-  return <ListPlugin />;
-}
 
 export function RichTextJsonEditor({
   initialJson,
@@ -587,6 +576,7 @@ export function RichTextJsonEditor({
   // Denna state är separat från Lexicals tillstånd men uppdateras samtidigt som noder skapas
   const [files, setFiles] = useState<SharepointFilePayload[]>([]);
   const [focus, setFocus] = useState(false);
+  const editableRef = useRef<HTMLDivElement>(null);
 
   // Initial konfiguration för Lexical
   const initialConfig = {
@@ -614,7 +604,6 @@ export function RichTextJsonEditor({
             const parsed = editor.parseEditorState(initialJson);
             // Sätt editorns tillstånd till det parsaade tillståndet
             editor.setEditorState(parsed);
-            console.log("Initial JSON laddad.", initialJson);
             // Optional: Återpopulation av 'files' state från initialJson om noderna finns där
             // Detta kräver att du itererar över det parsaade tillståndet och extraherar noddata.
             // Mer komplext och utelämnat för enkelhet just nu.
@@ -641,13 +630,33 @@ export function RichTextJsonEditor({
             contentEditable={
               // ContentEditable är själva DIV:en som är redigerbar
               <ContentEditable
-                onFocus={() => setFocus(true)}
+                ref={editableRef}
+                onFocus={() => {
+                  setFocus(true);
+
+                  setTimeout(() => {
+                    editableRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "center",
+                    });
+                  }, 100);
+                }}
                 onBlur={() => setFocus(false)}
                 className="peer w-full text-sm text-zinc-300 font-light bg-transparent outline-none placeholder-zinc-500 px-3 py-2 min-h-[36px] leading-snug
     [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:pl-4 [&_ul]:text-zinc-300
     [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:pl-4 [&_ol]:text-zinc-300
-    [&_li]:ml-2 [&_li]:leading-snug"
+    [&_li]:ml-2 [&_li]:leading-snug select-text focus:outline-none"
                 aria-placeholder="Skriv en kommentar..."
+                suppressContentEditableWarning
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                inputMode="text"
+                style={{
+                  WebkitTouchCallout: "none", // Disable iOS copy/define
+                  WebkitUserSelect: "auto", // Tillåt markering men undvik system-popup
+                  userSelect: "auto",
+                }}
               />
             }
             placeholder={
@@ -661,7 +670,7 @@ export function RichTextJsonEditor({
             // Standard ErrorBoundary rekommenderas i produktion
             ErrorBoundary={() => ""}
           />
-          <DebugListPlugin />
+          <ListPlugin />
           <SharepointPastePlugin setFiles={setFiles} />
           <BlurPlugin files={files} onBlur={onBlur} />
           <HistoryPlugin />

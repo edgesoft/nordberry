@@ -198,11 +198,8 @@ export function FileUploader({
           extension={getExtension(f.file?.name)}
           onRemove={async () => {
 
-            
             const isExisting = f.result?.existing;
-
             if (isExisting) {
-
               setUploadingFiles((prev) =>
                 prev.map((x) =>
                   x.id === f.id ? { ...x, markedForDeletion: true } : x
