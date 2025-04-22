@@ -642,6 +642,9 @@ export function RichTextJsonEditor({
                   }, 100);
                 }}
                 onBlur={() => setFocus(false)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                }}
                 className="peer w-full text-sm text-zinc-300 font-light bg-transparent outline-none placeholder-zinc-500 px-3 py-2 min-h-[36px] leading-snug
     [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:pl-4 [&_ul]:text-zinc-300
     [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:pl-4 [&_ol]:text-zinc-300
@@ -654,8 +657,8 @@ export function RichTextJsonEditor({
                 inputMode="text"
                 style={{
                   WebkitTouchCallout: "none", // Disable iOS copy/define
-                  WebkitUserSelect: "none", // Tillåt markering men undvik system-popup
-                  userSelect: "none",
+                  WebkitUserSelect: "text", // Tillåt markering men undvik system-popup
+                  userSelect: "test",
                 }}
               />
             }
