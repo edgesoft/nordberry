@@ -221,12 +221,14 @@ function renderChildren(
     if (child.type === "text") {
       let className = "";
       if (child.format) {
-        if (child.format & 1) className += " font-bold";
-        if (child.format & 2) className += " italic";
-        if (child.format & 4) className += " underline";
-        if (child.format & 8) className += " line-through";
-        if (child.format & 16)
+        const format = typeof child.format === "string" ? parseInt(child.format) : child.format;
+        if (format & 1) className += " font-bold";
+        if (format & 2) className += " italic";
+        if (format & 8) className += " underline";
+        if (format & 4) className += " line-through";
+        if (format & 16)
           className += " font-mono bg-zinc-800 px-1 rounded";
+
       }
 
       parts.push(
