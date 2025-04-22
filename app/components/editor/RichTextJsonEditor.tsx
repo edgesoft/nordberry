@@ -654,8 +654,8 @@ export function RichTextJsonEditor({
                 inputMode="text"
                 style={{
                   WebkitTouchCallout: "none", // Disable iOS copy/define
-                  WebkitUserSelect: "auto", // Tillåt markering men undvik system-popup
-                  userSelect: "auto",
+                  WebkitUserSelect: "none", // Tillåt markering men undvik system-popup
+                  userSelect: "none",
                 }}
               />
             }
