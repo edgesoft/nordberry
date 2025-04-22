@@ -52,8 +52,10 @@ export function FileBadge({
   onRemove,
 }: FileBadgeProps) {
   const { activeId, bind, clear } = useLongHoverPress(500);
-  const [filePendingDeletion, setFilePendingDeletion] =
-    useState<UploadingFile | null>(null);
+  const [filePendingDeletion, setFilePendingDeletion] = useState<{
+    id: string;
+    filename?: string;
+  } | null>(null);
   const isActive = activeId === id;
 
   return (
