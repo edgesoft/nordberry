@@ -1,7 +1,9 @@
 // file-upload.tsx
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+import { useLongHoverPress } from "~/hooks/useLongHoverPress";
 import { getS3KeyFromUrl } from "~/utils/s3.shared";
+import { deviceIsTouch } from "~/hooks/useLongHoverPress";
 
 interface TaskForComponent {
   id: string;
@@ -37,54 +39,108 @@ interface FileBadgeProps {
   progress: number;
   extension?: string;
   filename?: string;
+  id: string;
   onRemove?: () => void;
 }
-
-
 
 export function FileBadge({
   uploaded,
   progress,
   extension,
   filename,
+  id,
   onRemove,
 }: FileBadgeProps) {
+  const { activeId, bind, clear } = useLongHoverPress(500);
+  const [filePendingDeletion, setFilePendingDeletion] =
+    useState<UploadingFile | null>(null);
+  const isActive = activeId === id;
+
   return (
     <div
-      title={filename ?? extension}
+      {...bind(id)}
       className={`relative w-9 h-9 group ${!uploaded ? "animate-pulse" : ""}`}
     >
-      <div className="relative w-full h-full rounded-full border-2 border-zinc-700 bg-zinc-800 text-white text-[10px] font-mono flex items-center justify-center">
-        {!uploaded && (
-          <div
-            className="absolute inset-0 bg-zinc-600 rounded-full z-0"
-            style={{
-              clipPath: `inset(${100 - progress}% 0% 0% 0%)`,
-              transition: "clip-path 0.3s ease-in-out",
-            }}
-          />
-        )}
-        <span className="z-10">{extension?.toUpperCase() ?? "..."}</span>
-      </div>
-
-      {onRemove && (
-        <button
-          onClick={onRemove}
-          type={"button"}
-          className="absolute -top-1 -right-0.5 w-4 h-4 bg-zinc-700 rounded-full flex items-center justify-center hover:bg-red-600 group-hover:opacity-100 opacity-0 transition-opacity z-20"
-          title="Ta bort fil"
-        >
-          <svg
-            className="w-3 h-3 text-zinc-900 group-hover:text-white"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+      {isActive && (
+        <div className="absolute -top-7 -left-5 bg-zinc-700 text-white text-xs px-2 py-1 rounded shadow-md whitespace-nowrap z-30 hidden md:block">
+          {filename ?? extension}
+        </div>
       )}
+      <div className="relative w-full h-full rounded-full border-2 border-zinc-700 bg-zinc-800 text-white text-[10px] font-mono flex items-center justify-center">
+        {isActive && uploaded ? (
+          <button
+            type={"button"}
+            onClick={
+              deviceIsTouch
+                ? () => setFilePendingDeletion({ filename, id })
+                : onRemove
+            }
+          >
+            <svg
+              className="w-7 h-7 text-zinc-500 z-10"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        ) : (
+          <span className="z-10">{extension?.toUpperCase() ?? "..."}</span>
+        )}
+
+        {/* Mobil meny – visas endast på små skärmar */}
+        {filePendingDeletion && (
+          <div className="sm:hidden font-sans fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm">
+            {/* Klick utanför stänger */}
+            <div
+              className="absolute inset-0"
+              onClick={() => setFilePendingDeletion(null)}
+            />
+
+            <div
+              className="w-full bg-zinc-900 rounded-t-2xl p-4 z-10 space-y-4"
+              style={{
+                transform: "translateY(0%)",
+                opacity: 1,
+                transition: "transform 0.3s ease-out, opacity 0.3s ease-out",
+              }}
+            >
+              <p className="text-sm text-white">Vill du ta bort filen?</p>
+              <p className="text-xs text-zinc-400 truncate">
+                {filePendingDeletion.filename}
+              </p>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setFilePendingDeletion(null);
+                    clear();
+                  }}
+                  className="px-4 py-2 bg-zinc-700 rounded-md text-sm text-white"
+                >
+                  Avbryt
+                </button>
+                <button
+                  onClick={async () => {
+                    onRemove();
+                    setFilePendingDeletion(null);
+                    clear();
+                  }}
+                  className="px-4 py-2 bg-red-600 rounded-md text-sm text-white"
+                >
+                  Ta bort
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -177,7 +233,11 @@ export function FileUploader({
             strokeWidth="2.5"
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 4v16m8-8H4"
+            />
           </svg>
         </button>
       </div>
@@ -190,48 +250,53 @@ export function FileUploader({
         className="hidden"
       />
 
-      {uploadingFiles.filter((f) => !f.markedForDeletion).map((f) => (
-        <FileBadge
-          key={f.id}
-          uploaded={f.uploaded}
-          progress={f.progress}
-          extension={getExtension(f.file?.name)}
-          onRemove={async () => {
+      {uploadingFiles
+        .filter((f) => !f.markedForDeletion)
+        .map((f) => (
+          <FileBadge
+            key={f.id}
+            id={f.id}
+            uploaded={f.uploaded}
+            progress={f.progress}
+            extension={getExtension(f.file?.name)}
+            filename={f.file?.name}
+            onRemove={async () => {
+              const isExisting = f.result?.existing;
+              if (isExisting) {
+                setUploadingFiles((prev) =>
+                  prev.map((x) =>
+                    x.id === f.id ? { ...x, markedForDeletion: true } : x
+                  )
+                );
+                return;
+              } else {
+                // 🟢 Nya filer = OK att ta bort från S3 direkt
+                const key = f.result?.url
+                  ? getS3KeyFromUrl(f.result.url)
+                  : null;
+                if (key) {
+                  const formData = new FormData();
+                  formData.append("key", key);
 
-            const isExisting = f.result?.existing;
-            if (isExisting) {
-              setUploadingFiles((prev) =>
-                prev.map((x) =>
-                  x.id === f.id ? { ...x, markedForDeletion: true } : x
-                )
-              );
-              return; 
-            } else {
-              // 🟢 Nya filer = OK att ta bort från S3 direkt
-              const key = f.result?.url ? getS3KeyFromUrl(f.result.url) : null;
-              if (key) {
-                const formData = new FormData();
-                formData.append("key", key);
-          
-                try {
-                  const res = await fetch("/api/files/remove", {
-                    method: "POST",
-                    body: formData,
-                  });
-          
-                  const json = await res.json();
-                  if (!json.success) {
-                    console.error("Failed to delete from S3", json.error);
+                  try {
+                    const res = await fetch("/api/files/remove", {
+                      method: "POST",
+                      body: formData,
+                    });
+
+                    const json = await res.json();
+                    if (!json.success) {
+                      console.error("Failed to delete from S3", json.error);
+                    }
+                  } catch (err) {
+                    console.error("Error deleting from S3", err);
                   }
-                } catch (err) {
-                  console.error("Error deleting from S3", err);
                 }
               }
-            }
-            setUploadingFiles((prev) => prev.filter((x) => x.id !== f.id));
-          }}
-        />
-      ))}
+              setUploadingFiles((prev) => prev.filter((x) => x.id !== f.id));
+            }}
+          />
+        ))}
     </div>
   );
 }

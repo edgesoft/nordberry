@@ -11,7 +11,7 @@ const isTouchDevice = () => {
 };
 
 // Kör detekteringen en gång
-const deviceIsTouch = isTouchDevice();
+export const deviceIsTouch = isTouchDevice();
 
 /**
  * En React Hook för att detektera långa tryck (touch) eller långa hover (mus).
