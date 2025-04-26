@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useRef, startTransition } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SignedIn, UserButton, useAuth } from "@clerk/remix";
 import {
   Link,
-  useRouteLoaderData,
-  useNavigate,
-  useLocation,
+  useRouteLoaderData, useLocation
 } from "@remix-run/react";
 import { ringColors } from "../utils/colors";
 import { useNordEvent } from "~/hooks/useNordEvent";
@@ -16,7 +14,7 @@ interface NewUserToastProps {
   user: any;
 }
 
-function NewUserToastToast({ t, user }: NewUserToastProps) {
+function NewUserToast({ t, user }: NewUserToastProps) {
   const title = `Ny användare`;
   const message = `Ny användare (${user.name}) behöver godkännas`;
   return (
@@ -111,7 +109,6 @@ function UserButtonWithBlur() {
 }
 
 const Header = () => {
-  const [open, setOpen] = useState(false);
   const rootData = useRouteLoaderData<typeof rootLoaderType>("root");
   const dbUser = rootData?.dbUser;
   const pendingApprovalCount = rootData?.pendingApprovalCount ?? 0;
@@ -122,13 +119,12 @@ const Header = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const location = useLocation();
 
-  // NYTT: Visa/dölj otillgängliga
   const [showDisabled, setShowDisabled] = useState(false);
   const visibleResults = showDisabled
     ? searchResults
     : searchResults.filter((t) => t.canAccess);
 
-  // Debounce + fetch
+
   useEffect(() => {
     if (!searchQuery) {
       setSearchResults([]);
@@ -152,7 +148,6 @@ const Header = () => {
     return () => clearTimeout(timeout);
   }, [searchQuery]);
 
-  // Klick utanför / Escape stänger
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (
@@ -177,7 +172,7 @@ const Header = () => {
     };
   }, []);
 
-  // Nord‐event för nya användare…
+
   useNordEvent((payload) => {
     const isAdmin = dbUser?.role === "admin";
     const isNewPendingUser =
@@ -190,7 +185,7 @@ const Header = () => {
         payload.revalidator.revalidate();
       }
       if (location.pathname !== "/admin/users") {
-        toast.custom((t) => <NewUserToastToast t={t} user={payload.data} />, {
+        toast.custom((t) => <NewUserToast t={t} user={payload.data} />, {
           duration: 4000,
           id: "new-user-toast",
         });
@@ -198,7 +193,6 @@ const Header = () => {
     }
   });
 
-  // Trigger‐sökning manuell (t.ex. vid FilterPopover)
   const triggerSearch = async () => {
     if (!searchQuery) return;
     setIsSearching(true);
@@ -217,22 +211,18 @@ const Header = () => {
 
   return (
     <header className="bg-black text-white px-1 py-3 border-b border-gray-800 flex justify-between items-center relative z-40">
-      {/* Sök‐overlay dyker upp först när panelen är öppen */}
 
-      {(searchResults.length > 0 || isFilterOpen || open) && (
+      {(searchResults.length > 0 || isFilterOpen ) && (
         <div
           className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 top-[4.75rem]"
           onClick={() => {
-            //setSearchQuery("");
             setSearchResults([]);
             setShowDisabled(false);
             setIsFilterOpen(false);
-            setOpen(false);
           }}
         />
       )}
 
-      {/* Logo */}
       <Link
         to="/"
         prefetch="intent"
@@ -249,7 +239,6 @@ const Header = () => {
       <div className="flex items-center gap-2 md:gap-2 flex-1 justify-between">
         {dbUser && dbUser.status === "active" && (
           <div ref={wrapperRef} className="relative w-full ">
-            {/* Sökfält */}
             <input
               type="text"
               placeholder="Sök flöde eller steg..."
@@ -263,13 +252,11 @@ const Header = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full px-3 py-1.5 pr-10 text-sm rounded-md bg-zinc-800 border border-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-2 focus:ring-green-600"
             />
-            {/* Spinner */}
             {isSearching && (
               <div className="absolute right-9 top-1/2 -translate-y-1/2">
                 <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
               </div>
             )}
-            {/* Filter‐knapp */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -287,23 +274,19 @@ const Header = () => {
                 <path d="M18,30a6,6,0,0,0-5.65,4H3a2,2,0,0,0,0,4h9.35A6,6,0,1,0,18,30Z" />
               </svg>
               {pendingApprovalCount > 0 && (
-              <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white ring-2 ring-zinc-900 shadow-sm">
-  {pendingApprovalCount}
-</span>
+                <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white ring-2 ring-zinc-900 shadow-sm">
+                  {pendingApprovalCount}
+                </span>
               )}
             </button>
-            {/* FilterPopover */}
-
             <FilterPopover
               isOpen={isFilterOpen}
               triggerSearch={triggerSearch}
               onClose={() => setIsFilterOpen(false)}
             />
 
-            {/* Sökresults‐panel */}
             {searchQuery && (visibleResults.length > 0 || isSearching) && (
               <div className="fixed inset-x-2 top-[4rem] rounded-md shadow-xl bg-zinc-900 border border-zinc-700 z-50 max-h-96 overflow-auto">
-                {/* Visa/Dölj otillgängliga */}
                 <div className="flex justify-end px-4 py-2 border-b border-zinc-800">
                   <button
                     onClick={() => setShowDisabled((v) => !v)}
@@ -377,8 +360,9 @@ const Header = () => {
             )}
           </div>
         )}
-
-        <UserButtonWithBlur />
+        <div className="ml-auto flex items-center">
+          <UserButtonWithBlur />
+        </div>
       </div>
     </header>
   );
