@@ -5,7 +5,6 @@ import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ListPlugin } from "@lexical/react/LexicalListPlugin";
-
 import {
   $createParagraphNode,
   $getRoot,
@@ -29,8 +28,6 @@ import {
   REMOVE_LIST_COMMAND,
   $isListNode,
 } from "@lexical/list";
-
-/* ----------- Badge Node för SharePoint ----------- */
 
 type SharepointFilePayload = {
   url: string;
@@ -132,7 +129,6 @@ function $createInlineBadgeNode(
 ): InlineBadgeNode {
   return new InlineBadgeNode(text, url, source);
 }
-/* ----------- Regex & Parser ----------- */
 
 export function extractLinkedFiles(content: string) {
   const results: { url: string; source: string; name: string }[] = [];
@@ -184,10 +180,6 @@ function extractNameFromUrl(url: string): string {
   }
 }
 
-/* ----------- Toolbar ----------- */
-// Toolbar förblev oförändrad
-
-/* ----------- Ikoner ----------- */
 const IconButton = ({
   isActive,
   onClick,
@@ -562,78 +554,81 @@ function CanPostPlugin({
   return null;
 }
 
+function EditorFocusPlugin({ shouldFocus }: { shouldFocus: boolean }) {
+  const [editor] = useLexicalComposerContext();
+  useEffect(() => {
+    if (shouldFocus && editor) {
+      const timer = setTimeout(() => {
+        editor.focus(() => {
+          editor.update(() => {
+            const root = $getRoot();
+            root.selectEnd();
+          });
+        });
+      }, 50);
+
+      return () => clearTimeout(timer); 
+    }
+  }, [shouldFocus, editor]);
+
+  return null; 
+}
+
 
 export function RichTextJsonEditor({
+  isEditing,
   initialJson,
   onBlur,
   onCanPostChange,
 }: {
+  isEditing: boolean,
   initialJson?: any;
   onBlur: (result: { json: any; files: SharepointFilePayload[] }) => void;
   onCanPostChange?: (canPost: boolean) => void;
 }) {
-  // Håll state för filer som har infogats via paste
-  // Denna state är separat från Lexicals tillstånd men uppdateras samtidigt som noder skapas
   const [files, setFiles] = useState<SharepointFilePayload[]>([]);
   const [focus, setFocus] = useState(false);
   const editableRef = useRef<HTMLDivElement>(null);
 
-  // Initial konfiguration för Lexical
   const initialConfig = {
-    namespace: "Editor", // Unikt namn för editor-instansen
+    namespace: "Editor",
 
     theme: {
       paragraph: "font-light text-zinc-300 text-sm leading-snug",
       text: {
-        bold: "font-bold text-white", // starkare fetstil
+        bold: "font-bold text-white",
         italic: "italic",
         underline: "underline",
         strikethrough: "line-through",
         code: "font-mono bg-zinc-800 px-1 rounded",
       },
     },
-    // Hantera Lexical-fel, skriv ut till konsolen
     onError: (error: Error) => console.error("Lexical error:", error),
-    // Registrera dina anpassade noder här! Viktigt för serialisering/deserialisering och rendering.
     nodes: [InlineBadgeNode, ListNode, ListItemNode],
-    // Ladda initialt JSON-tillstånd om det finns
     editorState: initialJson
       ? (editor: LexicalEditor) => {
           try {
-            // Skapa ett EditorState-objekt från JSON
             const parsed = editor.parseEditorState(initialJson);
-            // Sätt editorns tillstånd till det parsaade tillståndet
             editor.setEditorState(parsed);
-            // Optional: Återpopulation av 'files' state från initialJson om noderna finns där
-            // Detta kräver att du itererar över det parsaade tillståndet och extraherar noddata.
-            // Mer komplext och utelämnat för enkelhet just nu.
           } catch (e) {
             console.error("Kunde inte ladda initial JSON:", e);
-            // Hantera fel vid laddning, t.ex. sätt editorn till tomt tillstånd
-            editor.setEditorState(editor.parseEditorState(null)); // Eller ett tomt state
+            editor.setEditorState(editor.parseEditorState(null));
           }
         }
-      : undefined, // Om ingen initial JSON, starta med tomt tillstånd
+      : undefined,
   };
 
   return (
-    // LexicalComposer sätter upp editor-kontexten
     <LexicalComposer initialConfig={initialConfig}>
-      {/* UI-container för editorn och verktygsfält */}
       <div className="border border-zinc-700 rounded-md bg-zinc-900">
-        {/* Verktygsfältkomponent */}
         <Toolbar />
-        {/* Området där innehållet redigeras */}
         <div className="relative p-2 max-h-30 overflow-y-auto">
-          {/* RichTextPlugin hanterar standard beteende för rich text */}
           <RichTextPlugin
             contentEditable={
-              // ContentEditable är själva DIV:en som är redigerbar
               <ContentEditable
                 ref={editableRef}
                 onFocus={() => {
                   setFocus(true);
-
                   setTimeout(() => {
                     editableRef.current?.scrollIntoView({
                       behavior: "smooth",
@@ -663,14 +658,12 @@ export function RichTextJsonEditor({
               />
             }
             placeholder={
-              // Placeholder-element som syns när editorn är tom
               !focus && (
                 <div className="absolute top-2.5 left-3 text-zinc-500 text-sm pointer-events-none">
                   Skriv en kommentar...
                 </div>
               )
             }
-            // Standard ErrorBoundary rekommenderas i produktion
             ErrorBoundary={() => ""}
           />
           <ListPlugin />
@@ -678,6 +671,7 @@ export function RichTextJsonEditor({
           <BlurPlugin files={files} onBlur={onBlur} />
           <HistoryPlugin />
           <CanPostPlugin onCanPostChange={onCanPostChange ?? (() => {})} />
+          <EditorFocusPlugin shouldFocus={isEditing ?? false} />
         </div>
       </div>
     </LexicalComposer>
