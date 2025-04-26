@@ -83,6 +83,15 @@ export function ChainEditor({
     return () => document.removeEventListener("mousedown", click);
   }, [onClose, hasTouchedName, currentStep, stepList]);
 
+  useEffect(() => {
+    if (stepFlow === 1) {
+      const timer = setTimeout(() => {
+        stepTitleInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [stepFlow]);
+
 
   function handleEditStep(step: Step | null) {
     if (!step) {
@@ -297,17 +306,10 @@ export function ChainEditor({
           <button
             onClick={(e) => {
               e.preventDefault()
-              if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
-                (document.activeElement as HTMLElement).blur();
-              }
-              setStepFlow(1);
-              setEditStepId(null); 
-              setCurrentStep({
-                  title: "",
-                  dependencies: [],
-                  assignees: [],
-                  status: "pending",
-              });
+              e.stopPropagation()
+              chainNameInputRef.current?.blur();
+              stepTitleInputRef.current?.blur();
+              
               requestAnimationFrame(() => {
                 onClose();
               });
