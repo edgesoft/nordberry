@@ -60,7 +60,7 @@ export const useNordEvent = <TData = any>(onEvent?: Callback<TData>) => {
     };
 
     eventSource.onerror = (err) => {
-      console.error("SSE connection error:", err);
+      //console.error("SSE connection error:", err);
       setConnected(false);
       setError("Förlorad anslutning till server-push");
       eventSource.close(); 

@@ -220,15 +220,15 @@ export function ChainEditor({
       (t) => (
         <CustomToast
           t={t}
-          name="Spara flöde" // Behåll gemensam titel eller gör den också till parameter?
-          message={message} // Använd meddelandet som skickas in
+          name="Spara flöde"
+          message={message}
         />
       ),
       { duration: 2000 }
     );
-    setEditingName(true); // Säkerställ att inputfältet visas
+    setEditingName(true); 
     setTimeout(() => {
-      chainNameInputRef.current?.focus(); // Sätt fokus
+      chainNameInputRef.current?.focus(); 
     }, 0);
   };
 
@@ -265,7 +265,8 @@ export function ChainEditor({
       >
         <div
           className="flex items-center justify-between px-4 py-4 border-b border-[#2a2a2a]"
-          onClick={() => {
+          onClick={(e) => {
+            e.preventDefault()
             setEditingName(true);
             setTimeout(() => chainNameInputRef.current?.focus(), 0);
           }}
@@ -294,10 +295,14 @@ export function ChainEditor({
             </h2>
           )}
           <button
-            onClick={() => {
-              setStepFlow(1); // Återställ till första steget (eller ett neutralt värde om du har det)
-              setEditStepId(null); // Återställ ev. redigerat steg
-              setCurrentStep({ // Rensa nuvarande steg-data
+            onClick={(e) => {
+              e.preventDefault()
+              if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
+                (document.activeElement as HTMLElement).blur();
+              }
+              setStepFlow(1);
+              setEditStepId(null); 
+              setCurrentStep({
                   title: "",
                   dependencies: [],
                   assignees: [],
@@ -326,7 +331,6 @@ export function ChainEditor({
           </button>
         </div>
 
-        {/* lista */}
         {stepList.length > 0 && (
           <div className="px-4 pt-4">
             <StepList
@@ -367,7 +371,7 @@ export function ChainEditor({
             </div>
           )}
 
-          {/* steg 2 */}
+  
           {stepFlow === 2 && (
             <div className="space-y-4">
               <DependencySelector
@@ -398,7 +402,6 @@ export function ChainEditor({
             </div>
           )}
 
-          {/* steg 3 */}
           {stepFlow === 3 && (
             <div className="space-y-4">
               <AssigneeSelector
@@ -428,7 +431,6 @@ export function ChainEditor({
           )}
         </div>
 
-        {/* footer */}
         {stepList.length > 0 && (
           <div className="px-4 py-4 border-t border-[#2a2a2a] bg-[#181818] flex justify-end">
             <button
