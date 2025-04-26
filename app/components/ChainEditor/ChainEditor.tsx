@@ -28,7 +28,6 @@ export function ChainEditor({
   mode,
   onSave,
 }: ChainEditorProps) {
-
   const [chainName, setChainName] = useState(initialName);
   const [hasTouchedName, setHasTouchedName] = useState(false);
   const [stepFlow, setStepFlow] = useState(1);
@@ -50,7 +49,7 @@ export function ChainEditor({
 
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = originalStyle;
     };
@@ -84,14 +83,13 @@ export function ChainEditor({
   }, [onClose, hasTouchedName, currentStep, stepList]);
 
   useEffect(() => {
-    if (stepFlow === 1) {
-      const timer = setTimeout(() => {
+    const timer = setTimeout(() => {
+      if (!editingName) {
         stepTitleInputRef.current?.focus();
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [stepFlow]);
-
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   function handleEditStep(step: Step | null) {
     if (!step) {
@@ -226,18 +224,12 @@ export function ChainEditor({
   const handleSaveError = (message: string) => {
     if (navigator.vibrate) navigator.vibrate(10);
     toast.custom(
-      (t) => (
-        <CustomToast
-          t={t}
-          name="Spara flöde"
-          message={message}
-        />
-      ),
+      (t) => <CustomToast t={t} name="Spara flöde" message={message} />,
       { duration: 2000 }
     );
-    setEditingName(true); 
+    setEditingName(true);
     setTimeout(() => {
-      chainNameInputRef.current?.focus(); 
+      chainNameInputRef.current?.focus();
     }, 0);
   };
 
@@ -265,21 +257,13 @@ export function ChainEditor({
     (s, i) => i < currentIndex && s.id !== editStepId
   );
 
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center sm:px-4 z-50">
       <div
         ref={modalRef}
         className="bg-[#121212] text-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
       >
-        <div
-          className="flex items-center justify-between px-4 py-4 border-b border-[#2a2a2a]"
-          onClick={(e) => {
-            e.preventDefault()
-            setEditingName(true);
-            setTimeout(() => chainNameInputRef.current?.focus(), 0);
-          }}
-        >
+        <div className="flex items-center justify-between px-4 py-4 border-b border-[#2a2a2a]">
           {editingName ? (
             <input
               ref={chainNameInputRef}
@@ -295,7 +279,10 @@ export function ChainEditor({
           ) : (
             <h2
               className="text-lg font-bold cursor-pointer"
-              onClick={() => setEditingName(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingName(true);
+              }}
             >
               {chainName}
               <span className="bg-zinc-900 rounded-md px-2 py-1 text-gray-400 text-[10px] group-hover:text-white group-hover:bg-zinc-800 transition-colors">
@@ -305,11 +292,11 @@ export function ChainEditor({
           )}
           <button
             onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
+              e.preventDefault();
+              e.stopPropagation();
               chainNameInputRef.current?.blur();
               stepTitleInputRef.current?.blur();
-              
+
               requestAnimationFrame(() => {
                 onClose();
               });
@@ -373,7 +360,6 @@ export function ChainEditor({
             </div>
           )}
 
-  
           {stepFlow === 2 && (
             <div className="space-y-4">
               <DependencySelector
