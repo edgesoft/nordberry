@@ -1,30 +1,29 @@
 import {
-  useLoaderData,
   Link,
   useFetcher,
+  useLoaderData,
   useMatches,
   useRevalidator,
 } from "@remix-run/react";
-import { prisma } from "../utils/db.server";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useState, useEffect, useMemo } from "react";
-import Avatar from "../components/avatar";
+import { useEffect, useMemo } from "react";
+import { prisma } from "~/utils/db.server";
+import { requireUser } from "~/utils/auth.server";
 import { getAuth } from "@clerk/remix/ssr.server";
-import TaskStep from "../components/task-step";
-import ConfirmModal from "../components/confirm-modal";
-import { requireUser } from "../utils/auth.server";
-import RevokeApprovalButton from "../components/revoke-approval-button";
-import { FileUploader } from "../components/file-upload";
-import { useNordEvent } from "../hooks/useNordEvent";
-import { CommentBubble, DeleteUndoToast } from "../components/comment-bubble";
+import TaskStep from "~/components/task-step";
+import { FileUploader } from "~/components/file-upload";
+import { useNordEvent } from "~/hooks/useNordEvent";
+import { CommentBubble } from "~/components/comment-bubble";
+import { RichTextJsonEditor } from "~/components/editor/RichTextJsonEditor";
 import { sourceMatchers } from "~/utils/sourceMatcher";
 import toast from "react-hot-toast";
-import { RichTextJsonEditor } from "~/components/editor/RichTextJsonEditor";
 import { S3Storage } from "~/utils/s3.storage.driver.server";
 import { getS3KeyFromUrl } from "~/utils/s3.shared";
-import { v4 as uuidv4 } from "uuid";
+import { useComments } from "~/hooks/useComments";
+import { TaskApprovers } from "~/components/task/TaskApprovers";
 
-export const loader = async (args) => {
+export const loader: LoaderFunction = async (args: LoaderFunctionArgs) => {
   await requireUser(args, { requireActiveStatus: true });
   const { params } = args;
   const { taskId } = params;
@@ -42,33 +41,22 @@ export const loader = async (args) => {
               id: true,
               title: true,
               status: true,
-              assignments: {
-                select: {
-                  userId: true,
-                },
-              },
+              assignments: { select: { userId: true } },
             },
           },
         },
       },
       assignments: {
-        include: {
-          user: { select: { id: true, name: true, imageUrl: true } },
-        },
+        include: { user: { select: { id: true, name: true, imageUrl: true } } },
       },
       comments: {
-        where: {
-          deletedAt: null,
-        },
-        orderBy: {
-          createdAt: "asc"
-        },
+        where: { deletedAt: null },
+        orderBy: { createdAt: "asc" },
         include: {
           user: { select: { id: true, name: true, imageUrl: true } },
           files: true,
         },
       },
-
       dependencies: {
         select: {
           id: true,
@@ -79,502 +67,204 @@ export const loader = async (args) => {
       },
     },
   });
-
   if (!task) throw new Response("Task not found", { status: 404 });
 
-  const chain = task.chain;
-
-  return json({ task, chain });
+  return json({ task, chain: task.chain });
 };
 
-export function extractLinkedFiles(content: string) {
-  const results: { url: string; source: string; name: string }[] = [];
-
-  for (const matcher of sourceMatchers) {
-    const matches = content.match(matcher.regex) ?? [];
-    for (const url of matches) {
-      results.push({
-        url,
-        source: matcher.source,
-        name: matcher.extractName(url),
-      });
-    }
-  }
-
-  return results;
-}
-
-export const action = async (args) => {
+export const action = async (args: ActionFunctionArgs) => {
   const { userId } = await getAuth(args);
   if (!userId) return new Response("Unauthorized", { status: 401 });
 
-  const { request } = args;
-  const formData = await request.formData();
+  const fd = await args.request.formData();
+  const content = fd.get("content")?.toString().trim();
+  const taskId = fd.get("taskId")?.toString();
+  const commentId = fd.get("commentId")?.toString() || undefined;
+  const uploadedRaw = fd.getAll("uploadedFiles") as string[];
 
-  const content = formData.get("content")?.toString().trim();
-  const taskId = formData.get("taskId")?.toString();
-  const commentId = formData.get("commentId")?.toString();
-  const uploadedFilesRaw = formData.getAll("uploadedFiles") as string[];
+  const uploaded = uploadedRaw
+    .map((s) => {
+      try {
+        return JSON.parse(s);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 
-  console.log("📥 uploadedFilesRaw:", uploadedFilesRaw);
-
-  const uploadedFiles: UploadedFile[] = uploadedFilesRaw.map((f) => {
-    try {
-      return JSON.parse(f);
-    } catch (err) {
-      console.error("❌ Failed to parse uploadedFile:", f);
-      return null;
-    }
-  }).filter(Boolean);
-
-  console.log("📦 parsed uploadedFiles:", uploadedFiles);
-
-  if (!content || !taskId) {
+  if (!content || !taskId)
     return json({ error: "Invalid data" }, { status: 400 });
-  }
 
   const dbUser = await prisma.user.findUnique({
     where: { clerkUserId: userId },
   });
-
   if (!dbUser) return json({ error: "User not found" }, { status: 404 });
 
+  const toDelIds = uploaded // befintliga + markerade
+    .filter((f) => f.existing && f.markedForDeletion)
+    .map((f) => f.id);
+
+  const newFiles = uploaded // helt nya uppladdningar
+    .filter((f) => !f.existing && !f.markedForDeletion);
+
   const s3 = new S3Storage();
-  let comment;
+  const comment = commentId
+    ? await prisma.comment.update({
+        where: { id: commentId },
+        data: { content, editedAt: new Date() },
+      })
+    : await prisma.comment.create({
+        data: { content, taskId, userId: dbUser.id },
+      });
 
-  if (commentId) {
-    // 🟡 Uppdatera befintlig kommentar
-    comment = await prisma.comment.update({
-      where: { id: commentId },
-      data: {
-        content,
-        editedAt: new Date(),
-      },
+  if (toDelIds.length) {
+    const doomed = await prisma.file.findMany({
+      where: { id: { in: toDelIds } },
+      select: { id: true, url: true },
     });
 
-    // 🔴 Ta bort filer som är markedForDeletion
-    const filesToDelete = uploadedFiles.filter(
-      (f) => f.existing && f.markedForDeletion
-    );
+    for (const f of doomed) {
+      const key = decodeURIComponent(getS3KeyFromUrl(f.url));
 
-    console.log("🗑️ filesToDelete:", filesToDelete);
-
-    if (filesToDelete.length > 0) {
-      for (const file of filesToDelete) {
-        const rawKey = getS3KeyFromUrl(file.url);
-        const key = decodeURIComponent(rawKey);
-        if (key) {
-          try {
-            await s3.remove(key);
-            console.log("✅ S3 deleted:", key);
-          } catch (err) {
-            console.error("❌ S3 deletion failed:", key, err);
-          }
-        } else {
-          console.warn("⚠️ Missing or invalid S3 key for:", file.url);
-        }
+      if (key) {
+        console.log(`Försöker ta bort S3-objekt med nyckel: ${key}`); // Logga nyckeln
+        await s3.remove(key).catch((err) => {
+          console.error(
+            `Misslyckades att ta bort fil från S3 (key: ${key}, fileId: ${f.id}, commentId: ${comment.id}):`,
+            err
+          );
+        });
+      } else {
+        console.warn(`Kunde inte extrahera S3-nyckel från URL: ${f.url} (fileId: ${f.id})`);
       }
-
-      await prisma.file.deleteMany({
-        where: {
-          commentId,
-          url: { in: filesToDelete.map((f) => f.url) },
-        },
-      });
     }
 
-    // 🟢 Lägg till nya filer (som inte är markedForDeletion)
-    const newFiles = uploadedFiles.filter(
-      (f) => !f.existing && !f.markedForDeletion
-    );
+    await prisma.file.deleteMany({ where: { id: { in: toDelIds } } });
+  }
 
-    console.log("📤 newFiles to add:", newFiles);
-
-    if (newFiles.length > 0) {
-      await prisma.file.createMany({
-        data: newFiles.map((file) => ({
-          name: file.name,
-          url: file.url,
-          source: file.source,
-          userId: dbUser.id,
-          commentId: comment.id,
-        })),
-      });
-    }
-  } else {
-    // 🆕 Ny kommentar
-    comment = await prisma.comment.create({
-      data: {
-        content,
-        taskId,
+  if (newFiles.length) {
+    await prisma.file.createMany({
+      data: newFiles.map((f) => ({
+        name: f.name,
+        url: f.url,
+        source: f.source,
         userId: dbUser.id,
-      },
+        commentId: comment.id,
+      })),
     });
-
-    const validFiles = uploadedFiles.filter((f) => !f.markedForDeletion);
-
-    console.log("🆕 create new comment with files:", validFiles);
-
-    if (validFiles.length > 0) {
-      await prisma.file.createMany({
-        data: validFiles.map((file) => ({
-          name: file.name,
-          url: file.url,
-          source: file.source,
-          userId: dbUser.id,
-          commentId: comment.id,
-        })),
-      });
-    }
   }
 
   return json({ success: true });
 };
 
-const useRootData = () => {
-  const rootData = useMatches().find((m) => m.id === "root")?.data;
-  const dbUser = rootData?.dbUser;
 
-  return { dbUser };
+
+const useRootData = () => {
+  const root = useMatches().find((m) => m.id === "root")?.data;
+  return { dbUser: root?.dbUser };
 };
 
-function TaskApprovers({ task, assignees }) {
-  const fetcher = useFetcher();
-  const { dbUser } = useRootData();
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const canApprove = task.dependencies.every((d) => d.status === "done");
-  const [confirmingAssignee, setConfirmingAssignee] = useState(null); // Initialt null
-
-  const handleConfirmApproval = () => {
-    fetcher.submit(
-      { taskId: confirmingAssignee.taskId, userId: confirmingAssignee.userId }, // Datan som ska skickas
-      { method: "post", action: "/api/task/approve" } // Metod och action
-    );
-    setIsConfirmModalOpen(false);
-  };
-
-  // Funktion för att öppna modalen
-  const handleOpenModal = (assignee) => {
-    setConfirmingAssignee(assignee);
-    setIsConfirmModalOpen(true);
-  };
-
-  // Funktion för att stänga modalen
-  const handleCloseModal = () => {
-    // Förhindra stängning om en åtgärd redan pågår
-    if (fetcher.state === "idle") {
-      setConfirmingAssignee(null);
-      setIsConfirmModalOpen(false);
-    }
-  };
-
-  const isSubmitting = fetcher.state !== "idle";
-  const isDisabled = !canApprove || isSubmitting || task.status !== "working";
-
-  return (
-    <div className="space-y-2">
-      <div className="space-y-2">
-        {assignees.map((assignee) => {
-          const { approved, role, user } = assignee;
-          const isApprover = role === "approver";
-
-          if (role === "viewer") return null;
-
-          const ringClass = approved
-            ? "ring-emerald-400"
-            : isApprover
-            ? "ring-orange-400"
-            : "ring-gray-600";
-
-          return (
-            <div
-              key={user.id}
-              className="flex items-center justify-between bg-zinc-800 p-2 rounded-lg"
-            >
-              <div className="flex items-center space-x-3">
-                <div className={`ring-1 rounded-full w-6 h-6 ${ringClass}`}>
-                  <Avatar user={user} size={6} />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-white">
-                    {user.name}
-                  </div>
-                  <div className="text-xs text-zinc-400">{user.email}</div>
-                </div>
-              </div>
-
-              {approved ? (
-                <RevokeApprovalButton
-                  taskId={task.id}
-                  userId={user.id}
-                  taskStatus={task.status}
-                />
-              ) : (
-                assignee.user.id === dbUser?.id &&
-                !assignee.approved &&
-                isApprover && (
-                  <>
-                    <button
-                      type="button" // Viktigt! Ändrat från "submit"
-                      onClick={() => handleOpenModal(assignee)} // Öppnar modalen
-                      title={
-                        canApprove && task.status === "working"
-                          ? "Godkänn steget"
-                          : task.status === "working"
-                          ? "Kan inte godkänna innan beroenden är klara"
-                          : "Steget är inte i arbete"
-                      }
-                      // Inaktivera om man inte får godkänna ELLER om fetcher redan jobbar
-                      disabled={isDisabled}
-                      // Uppdatera klasser för att hantera 'disabled' och 'isSubmitting'
-                      className={`text-sm text-white p-1 rounded-full transition duration-150 ease-in-out ${
-                        !isDisabled
-                          ? "bg-zinc-700 hover:bg-green-600" // Normal/Hover state
-                          : "bg-zinc-500 opacity-60 cursor-not-allowed" // Disabled state (justerad färg/opacity)
-                      }`}
-                    >
-                      {/* Valfritt: Visa en spinner när fetcher jobbar */}
-                      {isSubmitting ? (
-                        <svg
-                          className="animate-spin h-5 w-5 text-white"
-                          x
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                      ) : (
-                        // Ordinarie ikon
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      )}
-                    </button>
-
-                    {/* Rendera modalen villkorligt */}
-                    <ConfirmModal
-                      isOpen={isConfirmModalOpen}
-                      onClose={handleCloseModal}
-                      onConfirm={handleConfirmApproval}
-                      title="Bekräfta godkännande"
-                      isSubmitting={isSubmitting} // Skicka status till modalen
-                    >
-                      {/* Detta är `children` till modalen */}
-                      Är du säker på att du vill godkänna detta steg? Detta kan
-                      öppna nya steg och kedjor.
-                    </ConfirmModal>
-                  </>
-                )
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 export default function TaskView() {
   const { task, chain } = useLoaderData<typeof loader>();
-  const revalidator = useRevalidator();
   const { dbUser } = useRootData();
   const fetcher = useFetcher();
-  const commentDeleteFetcher = useFetcher();
-  const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
-  const [canPost, setCanPost] = useState(false);
-  const [commentJson, setCommentJson] = useState<string | null>(null);
-  const [resetKey, setResetKey] = useState(0);
-  const [toastHistory, setToastHistory] = useState<Record<string, number>>({});
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const commentDel = useFetcher();
+  const revalidator = useRevalidator();
 
-  useNordEvent((payload) => {
+  const { state, actions } = useComments({
+    initial: task.comments,
+    dbUser,
+    revalidate: () => revalidator.revalidate(),
+  });
+
+  const { comments, resetKey, editingId, commentJson, canPost, uploadedFiles } =
+    state;
+
+  const {
+    setCommentJson,
+    setCanPost,
+    setUploadedFiles,
+    startEdit,
+    cancelEdit,
+    applyOptimisticSave,
+    maybeToastDelete,
+  } = actions;
+
+
+  useNordEvent((p) => {
     if (
-      (payload.table === "task" && payload.data?.id === task.id) ||
-      (payload.table === "taskuser" && payload.data?.taskId === task.id) ||
-      (payload.table === "comment" && payload.data?.taskId === task.id) ||
-      (payload.table === "file" && payload.data?.comment?.taskId === task.id)
+      (p.table === "task" && p.data?.id === task.id) ||
+      (p.table === "taskuser" && p.data?.taskId === task.id) ||
+      (p.table === "comment" && p.data?.taskId === task.id) ||
+      (p.table === "file" && p.data?.comment?.taskId === task.id)
     ) {
-      payload.revalidator.revalidate();
+      p.revalidator.revalidate();
     }
   });
 
-  const uploadedFiles = useMemo(
-    () =>
-      uploadingFiles
-        .filter((f) => f.result || f.markedForDeletion)
-        .map((f) => ({
-          ...f.result!,
-          existing: f.result?.existing ?? false,
-          markedForDeletion: f.markedForDeletion ?? false,
-        })),
-    [uploadingFiles]
-  );
-
-  const hasUnfinishedUploads = useMemo(
-    () => uploadingFiles.some((f) => !f.uploaded),
-    [uploadingFiles]
-  );
-
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success) {
-      setCommentJson(null);
-      setCanPost(false);
-      setResetKey((k) => k + 1);
-      setUploadingFiles([]);
-      setEditingCommentId(null)
+      applyOptimisticSave();
+      revalidator.revalidate();
     }
   }, [fetcher.state, fetcher.data]);
 
-  useEffect(() => {
-    const deletedId = commentDeleteFetcher.data?.deletedCommentId;
-    const now = Date.now();
-
-    const lastShown = deletedId ? toastHistory[deletedId] : null;
-    const recentlyShown = lastShown && now - lastShown < 2000;
-
-    const shouldShowToast =
-      commentDeleteFetcher.state === "idle" &&
-      commentDeleteFetcher.data?.success &&
-      deletedId &&
-      !recentlyShown;
-
-    if (shouldShowToast) {
-      setToastHistory((prev) => ({ ...prev, [deletedId]: now }));
-
-      toast.custom(
-        (t) => (
-          <DeleteUndoToast
-            t={t}
-            commentId={deletedId}
-            onUndoSuccess={() => {
-              revalidator.revalidate();
-            }}
-          />
-        ),
-        { duration: 5000 }
-      );
-    }
-
-    if (
-      commentDeleteFetcher.state === "idle" &&
-      commentDeleteFetcher.data?.error
-    ) {
-      toast.error(
-        `Kunde inte ta bort kommentar: ${commentDeleteFetcher.data.error}`
-      );
-      revalidator.revalidate();
-    }
-  }, [
-    commentDeleteFetcher.state,
-    commentDeleteFetcher.data,
-    toastHistory,
-    revalidator,
-  ]);
+  
 
   useEffect(() => {
-    const handler = (event: FocusEvent) => {
-      const el = event.target as HTMLElement;
+    if (commentDel.state === "idle") {
+      maybeToastDelete(commentDel.data);
+      if (commentDel.data?.error)
+        toast.error(`Kunde inte ta bort kommentar: ${commentDel.data.error}`);
+    }
+  }, [commentDel.state, commentDel.data]);
+
+  useEffect(() => {
+    const h = (e: FocusEvent) => {
+      const el = e.target as HTMLElement;
       if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
-        setTimeout(() => {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 300);
+        setTimeout(
+          () => el.scrollIntoView({ behavior: "smooth", block: "center" }),
+          300
+        );
       }
     };
-    window.addEventListener("focusin", handler);
-    return () => window.removeEventListener("focusin", handler);
+    window.addEventListener("focusin", h);
+    return () => window.removeEventListener("focusin", h);
   }, []);
 
-  const isEnabled = useMemo(
-    () => canPost && task.status === "working" && !hasUnfinishedUploads,
-    [canPost, task.status, hasUnfinishedUploads]
-  );
-
-  const renderSteps = useMemo(
+  const steps = useMemo(
     () => (
       <div className="flex flex-wrap gap-2">
-        {chain.tasks.map((t) => (
-          <TaskStep
-            loggedInDbUserId={dbUser.id}
-            key={t.id}
-            step={t}
-            useLink={true}
-          />
+        {chain.tasks.map((s) => (
+          <TaskStep key={s.id} step={s} loggedInDbUserId={dbUser.id} useLink />
         ))}
       </div>
     ),
     [chain.tasks, dbUser.id]
   );
 
-  const renderComments = useMemo(() => {
-    if (task.comments.length === 0) return null;
+  const renderedComments = useMemo(() => {
+    if (!comments.length) return null;
     return (
       <div className="space-y-3">
-        {task.comments.map((comment, idx) => {
-          const prev = task.comments[idx - 1];
-          return (
-            <CommentBubble
-              key={comment.id}
-              comment={comment}
-              dbUserId={dbUser?.id}
-              prevUserId={prev?.user.id}
-              deleteFetcher={commentDeleteFetcher}
-              editingCommentId={editingCommentId}
-              onEditRequest={() => {
-                setEditingCommentId(comment.id);
-                setCommentJson(comment.content); // den är redan JSON-string
-                setResetKey((k) => k + 1); 
-                setUploadingFiles(
-                  comment.files.map((f) => ({
-                    id: uuidv4(),
-                    file: { name: f.name },
-                    uploaded: true,
-                    progress: 100,
-                    result: {
-                      name: f.name,
-                      url: f.url,
-                      source: f.source,
-                      existing: true
-                    },
-                  }))
-                );
-                setTimeout(() => {
-                  setCanPost(true); 
-                }, 10);
-              }}
-              onCancelEdit={() => {
-                setEditingCommentId(undefined);
-                setCommentJson("");
-                setCanPost(false);
-                setResetKey((k) => k + 1);
-                setUploadingFiles([]);
-              }}
-            />
-          );
-        })}
+        {comments.map((c, i) => (
+          <CommentBubble
+            key={c.id}
+            comment={c}
+            dbUserId={dbUser.id}
+            prevUserId={comments[i - 1]?.user.id}
+            deleteFetcher={commentDel}
+            editingCommentId={editingId}
+            onEditRequest={() => startEdit(c)}
+            onCancelEdit={cancelEdit}
+          />
+        ))}
       </div>
     );
-  }, [task.comments, dbUser?.id, commentDeleteFetcher, editingCommentId]);
+  }, [comments, dbUser.id, editingId]);
+
+  const isEnabled = canPost && task.status === "working";
 
   return (
     <>
@@ -588,95 +278,67 @@ export default function TaskView() {
             <span className="text-xl leading-none pr-1">←</span>
             Tillbaka
           </Link>
-          <h1 className="text-white text-lg font-semibold">
+          <h1 className="text-lg font-semibold">
             {chain.name} / {task.title}
           </h1>
         </div>
 
-        {renderSteps}
+        {steps}
         <TaskApprovers task={task} assignees={task.assignments} />
-        {renderComments}
+        {renderedComments}
       </div>
 
       {task.status === "working" && (
         <>
           <div className="h-10" />
-          <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#181818] border-t border-zinc-800 px-2 py-3 space-y-2">
+          <div className="fixed bottom-0 inset-x-0 z-30 bg-[#181818] border-t border-zinc-800 px-2 py-3 space-y-2">
             <fetcher.Form method="post">
               <RichTextJsonEditor
                 key={resetKey}
+                isEditing={editingId !== null}
                 initialJson={commentJson ? JSON.parse(commentJson) : undefined}
                 onCanPostChange={setCanPost}
-                onBlur={(data) => {
-                  const serialized = JSON.stringify(data.json);
-                  setCommentJson(serialized);
-                }}
+                onBlur={(d) => setCommentJson(JSON.stringify(d.json))}
               />
 
               <div className="flex items-center justify-between pt-1">
                 <FileUploader
-                  onUploadComplete={(uploaded) => {
-                    setUploadingFiles((prev) =>
-                      prev.map((f) =>
-                        !f.uploaded &&
-                        uploaded.some(
-                          (u) => u.name === f.file.name && u.url === f.url
-                        )
-                          ? {
-                              ...f,
-                              uploaded: true,
-                              progress: 100,
-                              result: uploaded.find(
-                                (u) => u.name === f.file.name && u.url === f.url
-                              ),
-                            }
-                          : f
-                      )
-                    );
-                  }}
-                  setUploadingFiles={setUploadingFiles}
-                  uploadingFiles={uploadingFiles}
-                  task={task}
+                  resetSignal={resetKey}
+                  task={{ id: task.id, status: task.status }}
+                  onUploadComplete={setUploadedFiles}
+                  existingFiles={uploadedFiles}
                 />
+
                 <input type="hidden" name="taskId" value={task.id} />
-                {editingCommentId && (
-                  <input
-                    type="hidden"
-                    name="commentId"
-                    value={editingCommentId}
-                  />
+                {editingId && (
+                  <input type="hidden" name="commentId" value={editingId} />
                 )}
                 {commentJson && (
                   <input type="hidden" name="content" value={commentJson} />
                 )}
-                {uploadedFiles.map((file) => (
+
+                {uploadedFiles.map((f) => (
                   <input
-                    key={`${file.url}-${file.name}`}
+                    key={f.id}
                     type="hidden"
                     name="uploadedFiles"
-                    value={JSON.stringify({
-                      ...file,
-                      existing: file.existing ?? false,
-                      markedForDeletion: file.markedForDeletion ?? false,
-                    })}
+                    value={JSON.stringify(f)}
                   />
                 ))}
+
                 <button
                   disabled={!isEnabled}
-                  className={`
-                    w-9 h-9 rounded-full flex items-center justify-center text-white transition-transform
-                    ${
-                      isEnabled
-                        ? "bg-green-700 hover:bg-green-600 hover:scale-105 cursor-pointer"
-                        : "bg-zinc-700 opacity-50 cursor-not-allowed"
-                    }
-                  `}
                   title="Skicka"
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-white transition-transform ${
+                    isEnabled
+                      ? "bg-green-700 hover:bg-green-600 hover:scale-105"
+                      : "bg-zinc-700 opacity-50 cursor-not-allowed"
+                  }`}
                 >
                   <svg
                     className="w-4 h-4 relative left-[1px]"
-                    fill="currentColor"
                     viewBox="0 0 24 24"
+                    fill="currentColor"
                   >
                     <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                   </svg>

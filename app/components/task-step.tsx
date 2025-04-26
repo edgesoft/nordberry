@@ -1,8 +1,7 @@
-import React from 'react';
-import { useNavigate, Link } from '@remix-run/react'; // Importera Link
-import { ringColors } from '../utils/colors'; // Anpassa sökväg
+import React from "react";
+import { useNavigate, Link } from "@remix-run/react";
+import { ringColors } from "../utils/colors";
 
-// Interface för task-data (samma som tidigare)
 interface TaskStepData {
   id: string;
   title: string;
@@ -10,50 +9,48 @@ interface TaskStepData {
   assignments?: Array<{ userId: string }>;
 }
 
-// Props för den uppdaterade komponenten
 interface TaskStepProps {
   step: TaskStepData;
   loggedInDbUserId: string | null | undefined;
-  useLink?: boolean; // Ny prop för att välja Link eller div
+  useLink?: boolean;
   className?: string;
 }
 
-// Byt namn på komponenten för att spegla dess flexibilitet
 function TaskStep({
   step,
   loggedInDbUserId,
-  useLink = false, // Default till false (rendera div)
-  className = '',
+  useLink = false,
+  className = "",
 }: TaskStepProps) {
   const navigate = useNavigate();
 
-  const isUserAssigned = loggedInDbUserId && step.assignments?.some(
-    (assignment) => assignment.userId === loggedInDbUserId
-  );
+  const isUserAssigned =
+    loggedInDbUserId &&
+    step.assignments?.some(
+      (assignment) => assignment.userId === loggedInDbUserId
+    );
 
-  const baseClasses = "flex items-center gap-1 px-2 py-0.5 text-xs rounded-md whitespace-nowrap transition-colors";
-  // Klasser för utseende baserat på om användaren är assignad
+  const baseClasses =
+    "flex items-center gap-1 px-2 py-0.5 text-xs rounded-md whitespace-nowrap transition-colors";
+
   const appearanceClasses = isUserAssigned
-    ? "text-gray-300 bg-zinc-800 hover:bg-zinc-700" // Interaktivt utseende
-    : "text-gray-500 bg-zinc-900 opacity-70";       // Icke-interaktivt utseende
+    ? "text-gray-300 bg-zinc-800 hover:bg-zinc-700"
+    : "text-gray-500 bg-zinc-900 opacity-70";
 
-  // Klass för cursor baserat på interaktivitet och elementtyp
   const cursorClass = isUserAssigned
-    ? (useLink ? '' : 'cursor-pointer') // Link har egen cursor, div behöver om assignad
-    : 'cursor-not-allowed';             // Ingen interaktion om ej assignad
+    ? useLink
+      ? ""
+      : "cursor-pointer"
+    : "cursor-not-allowed";
 
-  // Kombinera alla klasser
   const combinedClasses = `${baseClasses} ${appearanceClasses} ${cursorClass} ${className}`;
 
-  // ----- Gemensamma props för Link och div -----
   const commonProps = {
-    // key ska sättas i .map() där komponenten används
     className: combinedClasses,
     title: isUserAssigned ? step.title : `${step.title} (ej tilldelad)`,
-    'aria-disabled': !isUserAssigned,
+    "aria-disabled": !isUserAssigned,
   };
 
-  // ----- Gemensamt innehåll -----
   const content = (
     <>
       <span className={`w-2 h-2 rounded-md ${ringColors[step.status]}`} />
@@ -61,24 +58,15 @@ function TaskStep({
     </>
   );
 
-
   if (useLink) {
     if (isUserAssigned) {
       return (
-        <Link
-          to={`/task/${step.id}`}
-          prefetch="intent"
-          {...commonProps}
-        >
+        <Link to={`/task/${step.id}`} prefetch="intent" {...commonProps}>
           {content}
         </Link>
       );
     } else {
-      return (
-        <div {...commonProps}>
-          {content}
-        </div>
-      );
+      return <div {...commonProps}>{content}</div>;
     }
   } else {
     return (
@@ -94,8 +82,14 @@ function TaskStep({
             e.preventDefault();
           }
         }}
-        role={isUserAssigned ? "button" : undefined} // Tillgänglighet för klickbar div
-        tabIndex={isUserAssigned ? 0 : -1}       // Gör klickbar div fokuserbar
+        role={isUserAssigned ? "button" : undefined}
+        tabIndex={isUserAssigned ? 0 : -1}
+        onKeyDown={(e) => {
+          if (isUserAssigned && (e.key === 'Enter' || e.key === ' ')) {
+             e.preventDefault();
+             navigate(`/task/${step.id}`);
+          }
+       }}
       >
         {content}
       </div>
@@ -103,4 +97,4 @@ function TaskStep({
   }
 }
 
-export default TaskStep; // Exportera den uppdaterade komponenten
+export default TaskStep;

@@ -35,6 +35,7 @@ export const DeleteUndoToast = ({
       action: `/api/comments/${commentId}/undo-delete`, // Din Ångra-action
     });
     toast.dismiss(t.id); // Stäng toasten när Ångra klickas
+    onUndoSuccess();
   };
 
   // Om ångra-anropet lyckas, kör onUndoSuccess callback
@@ -159,13 +160,11 @@ function renderLexicalJsonToReact(json: any, isMine = false, isBeingEdited = fal
   let key = 0;
 
   for (const node of root.children) {
-    // ✳️ Tom paragraf = radbrytning
     if (node.type === "paragraph" && (!node.children || node.children.length === 0)) {
       output.push(<div key={key++} className="h-2" />);
       continue;
     }
 
-    // 📌 Paragraf med innehåll
     if (node.type === "paragraph" && Array.isArray(node.children)) {
       output.push(
         <div
@@ -178,7 +177,6 @@ function renderLexicalJsonToReact(json: any, isMine = false, isBeingEdited = fal
       continue;
     }
 
-    // 📌 Hantera listor
     if (node.type === "list" && Array.isArray(node.children)) {
       const isOrdered = node.listType === "number";
       const Tag = isOrdered ? "ol" : "ul";
@@ -249,8 +247,9 @@ function renderChildren(
       ].join(" ");
 
       if (url) {
+        const stableKey = child.id ?? child.url ?? `${parentId}-${index}`;
         parts.push(
-          <FileBadge key={key++}  name={text} url={url} isMine={isMine} isBeingEdited={isBeingEdited} />
+          <FileBadge key={stableKey}  name={text} url={url} isMine={isMine} isBeingEdited={isBeingEdited} />
         );
       } else {
         parts.push(
@@ -401,10 +400,8 @@ export function CommentBubble({
             </button>
             </>
             )}
-          
           </div>
-         
-
+        
           <CommentContent
             content={JSON.parse(comment.content)}
             isMine={isMine}
@@ -415,7 +412,7 @@ export function CommentBubble({
             <div className="flex-1 overflow-y-auto px-4 pl-0 flex-1 overflow-y-auto pt-4 ">
               {comment.files.map((file: any) => (
                 <FileBadge
-                  key={file.id}
+                  key={`attach-${file.id}`}
                   name={file.name}
                   url={
                     file.source === "S3" ? `/api/files/${file.id}` : file.url
@@ -449,8 +446,7 @@ export function CommentBubble({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Ta bort preventDefault om du inte behöver det för annat
-                  handleDeleteClick(); // Anropa den nya funktionen
+                  handleDeleteClick();
                 }}
                 className="text-zinc-500 hover:text-zinc-800 p-1"
               >
@@ -463,11 +459,8 @@ export function CommentBubble({
                 </svg>
               </button>
             </div>
-            {/* Mobil meny – visas endast på små skärmar */}
             <div className="sm:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm">
-              {/* Klick utanför stänger */}
               <div className="absolute inset-0" onClick={() => clear()} />
-
               <div
                 className="w-full bg-zinc-900 rounded-t-2xl p-4 z-10 space-y-4"
                 style={{
