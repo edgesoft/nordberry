@@ -273,6 +273,7 @@ export function ChainEditor({
                 if (!hasTouchedName) setHasTouchedName(true);
               }}
               onBlur={() => setEditingName(false)}
+              autoFocus
               className="bg-transparent border-b border-gray-600 text-xl font-bold focus:outline-none"
             />
           ) : (
