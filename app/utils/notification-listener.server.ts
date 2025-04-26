@@ -2,6 +2,8 @@
 import pg from 'pg'; // Importera standardexporten
 const { Client: PgClient } = pg;
 import EventEmitter from 'events'; // Node.js inbyggda
+import { dispatchNotification } from '~/notifications/notification.manager.server'; // <-- Importera dispatchern
+import type { NotificationPayload } from '~/notifications/types'; // <-- Importera payload-typen
 
 // --- Konfiguration ---
 const DATABASE_URL_PG = process.env.DATABASE_URL_PG;
@@ -80,10 +82,11 @@ async function connectAndListen(): Promise<void> {
 
     client.on('notification', (msg) => {
 
-        console.log(`>>> NOTIFICATION RECEIVED on channel '${msg.channel}':`, msg.payload);
-
       if (msg.channel === NOTIFY_CHANNEL && msg.payload) {
-        notificationEmitter.emit('update', msg.payload);
+        handleDatabaseNotification(msg.payload).catch(err => {
+          // Fånga fel specifikt från vår hanterare
+          console.error("[Notification Listener] Unhandled error in handleDatabaseNotification:", err);
+       });
       }
     });
 
@@ -155,6 +158,36 @@ async function closeListener() {
     }
   }
 }
+
+
+async function handleDatabaseNotification(payloadString: string | undefined) {
+  if (!payloadString) {
+    console.warn("[Notification Listener] Received empty or undefined payload string.");
+    return;
+  }
+
+  let parsedPayload: NotificationPayload;
+  try {
+    // Försök parsa payloaden enligt vår definierade typ
+    parsedPayload = JSON.parse(payloadString);
+    // Grundläggande validering av payload-struktur
+    if (!parsedPayload || typeof parsedPayload.table !== 'string' || typeof parsedPayload.action !== 'string') {
+        throw new Error("Parsed payload is missing required fields (table, action).");
+    }
+  } catch (error) {
+    console.error("[Notification Listener] Failed to parse JSON payload or invalid structure:", error);
+    return; // Kan inte göra något mer om payloaden är ogiltig
+  }
+
+  // Anropa den centrala dispatchern med den parsade payloaden
+  // Denna sköter logik för att skicka till LogProvider, EmailProvider etc.
+  dispatchNotification(parsedPayload).catch(err => {
+    // Fånga eventuella oväntade fel från dispatchern själv
+    console.error("[Notification Listener] Error calling dispatchNotification:", err);
+  });
+
+}
+
 
 // Exportera nödvändiga delar
 export { notificationEmitter, ensureListenerReady, closeListener };
