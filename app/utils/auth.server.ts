@@ -28,7 +28,6 @@ export async function requireUser(
     const { userId: clerkUserId } = await getAuth(args);
     if (!clerkUserId) {
         console.info("requireUser: Ingen Clerk userId. Omdirigerar till", SIGN_IN_URL);
-        // Kasta redirect för att avbryta loader/action direkt
         throw redirect(SIGN_IN_URL);
     }
 
