@@ -4,12 +4,11 @@ import { filterStatusCookie } from "~/utils/filter.server";
 
 export const action: ActionFunction = async ({ request }) => {
   const form = await request.formData();
-  // Läs av status‐värden
+
   const done = form.get("done") === "true";
   const working = form.get("working") === "true";
   const pending = form.get("pending") === "true";
 
-  // Prevent none selected
   if (!done && !working && !pending) {
     return json(
       { error: "Du måste ha minst en status vald." },
@@ -17,11 +16,8 @@ export const action: ActionFunction = async ({ request }) => {
     );
   }
 
-  // Huvud‐payload som sparas i cookien
   const payload = JSON.stringify({ done, working, pending });
-  console.log(payload)
 
-  // Sätt cookie
   const cookieHeader = await filterStatusCookie.serialize(payload);
 
   return json(

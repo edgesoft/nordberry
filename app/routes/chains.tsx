@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import { Outlet, useLoaderData, Link, useNavigate } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "@remix-run/node";
 import { prisma } from "../utils/db.server";
 import { json } from "@remix-run/node";
 import TaskStep from "../components/task-step";
@@ -7,20 +9,16 @@ import { useNordEvent } from "../hooks/useNordEvent";
 import { Statuses } from "~/types/filterStatusTypes";
 import { getFilterStatuses } from "~/utils/filter.server";
 
-export async function loader(args: LoaderArgs) {
+export async function loader(args: LoaderFunctionArgs) {
   const dbUser = await requireUser(args, { requireActiveStatus: true });
-  const {request} = args
+  const { request } = args;
 
   const rawStatuses: Statuses = await getFilterStatuses(request);
 
-  // 3) Bygg en lista med de status‐nycklar som är "på"
   const activeStatuses = (Object.entries(rawStatuses) as [string, boolean][])
     .filter(([, isOn]) => isOn)
     .map(([status]) => status);
 
-  // 4) Hämta kedjor med Prisma, filtrera både vilka chains
-  //    som har uppgifter för den inloggade användaren OCH
-  //    att uppgifterna har en status i activeStatuses
   const chains = await prisma.chain.findMany({
     where: {
       tasks: {
@@ -45,7 +43,6 @@ export async function loader(args: LoaderArgs) {
     },
   });
 
-  // 5) Returnera både kedjor, användare och de råa status‐värdena
   return json({
     chains,
     dbUser,
@@ -56,13 +53,11 @@ export async function loader(args: LoaderArgs) {
 export function EmptyChainsPanel() {
   return (
     <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-sm">
-      {/* Header / ikon / grid-mönster-bakgrund */}
       <Link
         prefetch="intent"
         to="/chains/new"
         className="bg-zinc-950 border-b border-zinc-800 p-6 flex justify-center items-center"
       >
-        {/* Exempelikon – byt gärna mot din egen SVG eller bild */}
         <svg
           className="h-8 w-8 text-zinc-500"
           fill="none"
@@ -77,8 +72,6 @@ export function EmptyChainsPanel() {
           />
         </svg>
       </Link>
-
-      {/* Text-content */}
       <div className="p-6 bg-zinc-930">
         <h3 className="text-white text-lg font-semibold mb-2">
           Inga flöden ännu
@@ -115,13 +108,15 @@ export function EmptyChainsPanel() {
 export default function ChainView() {
   const navigate = useNavigate();
   const { chains, dbUser } = useLoaderData<typeof loader>();
+
+  const taskIds = useMemo(() => {
+    return chains.flatMap((chain) => chain.tasks.map((t) => t.id));
+  }, [chains]);
+
   useNordEvent((payload) => {
     if (payload.table === "chain" && payload.action === "INSERT") {
-      // Ny chain skapad — vi vet inte om den är "min" → vi måste dubbelkolla
       payload.revalidator.revalidate();
     }
-
-    const taskIds = chains.flatMap((chain) => chain.tasks.map((t) => t.id));
 
     if (
       payload.table === "task" &&

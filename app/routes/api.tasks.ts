@@ -1,11 +1,11 @@
-import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { prisma } from "~/utils/db.server";
 import { requireUser } from "~/utils/auth.server";
-import { getFilterStatuses, Statuses } from "~/utils/filter.server";
+import { getFilterStatuses } from "~/utils/filter.server";
+import type { LoaderFunctionArgs } from "@remix-run/node";
 
-export const loader = async (args: LoaderArgs) => {
-  const {request} = args
+export const loader = async (args: LoaderFunctionArgs) => {
+  const { request } = args;
   try {
     const dbUser = await requireUser(args, {
       requireActiveStatus: true,
@@ -37,7 +37,7 @@ export const loader = async (args: LoaderArgs) => {
           {
             OR: [
               { title: { contains: query, mode: "insensitive" } },
-              { id:    { contains: query             } },
+              { id: { contains: query } },
               {
                 chain: {
                   name: { contains: query, mode: "insensitive" },
@@ -49,10 +49,10 @@ export const loader = async (args: LoaderArgs) => {
       },
       orderBy: { sortOrder: "asc" },
       select: {
-        id:          true,
-        title:       true,
-        status:      true,
-        chain:       { select: { name: true } },
+        id: true,
+        title: true,
+        status: true,
+        chain: { select: { name: true } },
         assignments: { select: { userId: true } },
       },
     });
@@ -62,7 +62,6 @@ export const loader = async (args: LoaderArgs) => {
       ...task,
       canAccess: task.assignments.some((a) => a.userId === dbUser.id),
     }));
-
 
     return json({ tasks: enriched });
   } catch (e: any) {

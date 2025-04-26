@@ -23,7 +23,6 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
     },
   });
 
-  console.log(chain);
 
   if (!chain) throw new Response("Flödet hittades inte", { status: 404 });
 
@@ -77,9 +76,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   console.log(deletedSteps);
 
-  /* ------------------------------------------------------------------ */
-  /* 1.  Gör allt i en transaktion                                      */
-  /* ------------------------------------------------------------------ */
+
   await prisma.$transaction(async (db) => {
     /* ----- 1.1  uppdatera kedjenamn --------------------------------- */
     await db.chain.update({ where: { id: chainId }, data: { name } });
