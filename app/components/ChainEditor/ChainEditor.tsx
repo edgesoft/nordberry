@@ -185,21 +185,21 @@ export function ChainEditor({
     setStepList((prev) => {
       const to = idx + dir;
       if (to < 0 || to >= prev.length) return prev;
-
+  
       const current = prev[idx];
       const neighbor = prev[to];
-
+  
       /* ----- status‑prioritet: lägre tal = högre upp i listan ----- */
       const prio: Record<Step["status"], number> = {
         done: 0,
         working: 1,
         pending: 2,
       };
-
-      /* tillåt flytt bara om vi inte passerar “bättre” status */
+  
+      /* tillåt flytt bara om vi inte passerar "bättre" status */
       const movingUp = dir === -1;
       const movingDown = dir === 1;
-
+  
       if (
         (movingUp && prio[current.status] > prio[neighbor.status]) ||
         (movingDown && prio[current.status] < prio[neighbor.status])
@@ -211,13 +211,44 @@ export function ChainEditor({
             message="Stegets status tillåter inte den här sorteringen."
           />
         ));
-        return prev; // blockera flytten
+        return prev;
       }
-
+  
       const arr = [...prev];
       const [m] = arr.splice(idx, 1);
       arr.splice(to, 0, m);
-      return arr.map((s, i) => ({ ...s, order: i }));
+  
+      // Om steget flyttas uppåt, kontrollera beroenden som behöver tas bort
+      if (movingUp && current.dependencies.length > 0) {
+        const removedDeps = current.dependencies.filter((dep) => {
+          const depIndex = arr.findIndex((s) => s.id === dep.id);
+          return depIndex >= to;
+        });
+  
+        if (removedDeps.length > 0) {
+          toast.custom((t) => (
+            <CustomToast
+              t={t}
+              name="Beroenden"
+              message="Beroenden togs bort på grund av sorteringen"
+            />
+          ));
+        }
+      }
+  
+      return arr.map((step, i) => {
+        if (i === to) {
+          const updatedDependencies = movingUp
+            ? step.dependencies.filter((dep) => {
+                const depIndex = arr.findIndex((s) => s.id === dep.id);
+                return depIndex < i;
+              })
+            : step.dependencies;
+  
+          return { ...step, dependencies: updatedDependencies, order: i };
+        }
+        return { ...step, order: i };
+      });
     });
   };
 

@@ -314,7 +314,7 @@ const Header = () => {
                             {task.title}
                           </span>
                           <span className="text-xs text-zinc-600 font-mono">
-                            #{task.id.slice(0, 6)} –{" "}
+                            #{task.id.slice(-6)} –{" "}
                             {task.chain?.name ?? "Okänt flöde"}
                           </span>
                         </div>
@@ -341,7 +341,7 @@ const Header = () => {
                             {task.title}
                           </span>
                           <span className="text-xs text-zinc-500 font-mono">
-                            #{task.id.slice(0, 6)} –{" "}
+                            #{task.id.slice(-6)} –{" "}
                             {task.chain?.name ?? "Okänt flöde"}
                           </span>
                         </div>

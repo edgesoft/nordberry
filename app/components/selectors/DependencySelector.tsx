@@ -181,7 +181,7 @@ export function DependencySelector({
                         } border border-gray-700`}
                       />
                       <span className="font-mono text-gray-400">
-                        #{s.id.slice(0, 6)}
+                      #{s.id.slice(-6)}
                       </span>
                       <span>{s.title}</span>
                     </li>
