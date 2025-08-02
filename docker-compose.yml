@@ -16,7 +16,7 @@ services:
       - .:/app
       # Undanta node_modules från mappningen - använd de i containern
       # Detta är en "named volume mount" inuti containern
-      - /app/node_modules
+      - nordberry_node_modules:/app/node_modules
     env_file: .env
     environment:
       - NODE_ENV=development
@@ -44,4 +44,6 @@ networks:
     driver: bridge
 volumes:
   postgres_data_dev: # Separat volym för dev-databasen
+    driver: local
+  nordberry_node_modules:
     driver: local
